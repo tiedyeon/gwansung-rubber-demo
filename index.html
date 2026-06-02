@@ -6,6 +6,8 @@
 <title>광성특수고무공업사 업무 관리 시스템</title>
 <!-- Supabase JS Client (CDN) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<!-- SheetJS for Excel import/export -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root{
     --bg:#f4f2ec; --surface:#ffffff; --ink:#1f1d18; --ink-soft:#6b6760;
@@ -120,6 +122,28 @@
   .item-meta{font-size:13px;color:var(--ink-soft);margin-top:2px}
   .item-memo{font-size:12.5px;color:var(--ink-soft);margin-top:3px;font-style:italic}
   .item-loc{font-size:12px;color:var(--accent);font-weight:600;margin-top:3px}
+
+  /* ===== Phase 2: 가져오기/내보내기 버튼 ===== */
+  .io-btn{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--surface);color:var(--ink-soft);font-size:12.5px;font-weight:600;padding:8px 12px;border-radius:9px;cursor:pointer;transition:.15s;white-space:nowrap}
+  .io-btn:hover{border-color:#c9c3b6;color:var(--ink)}
+  .io-btn:disabled{opacity:.45;cursor:not-allowed}
+  .io-btn.import{background:var(--blue-soft);border-color:#bcd0e6;color:var(--blue)}
+  .io-btn.import:hover{background:#dbe6f3;color:var(--blue)}
+  .io-btn.export{background:var(--accent-soft);border-color:#bcdacd;color:var(--accent)}
+  .io-btn.export:hover{background:#d6e7df;color:var(--accent)}
+  [data-theme="dark"] .io-btn.import:hover{background:#2a3848;color:#a0c5e8}
+  [data-theme="dark"] .io-btn.export:hover{background:#2e4239;color:#7fc4ad}
+
+  /* 일정 검색 */
+  .deliv-search-row{display:flex;gap:8px;padding:0 18px 12px;align-items:center}
+  .deliv-search-row input{flex:1;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:13px;padding:8px 12px;border-radius:8px;outline:none}
+  .deliv-search-row input:focus{border-color:var(--accent)}
+
+  /* 토스트 알림 */
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 20px;border-radius:10px;font-size:13.5px;font-weight:600;z-index:200;box-shadow:0 4px 18px rgba(0,0,0,.18);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px)}
+  .toast.error{background:var(--warn)}
+  .toast.success{background:var(--accent)}
 
   /* ===== 부족 발생 강조 (3번 단기) ===== */
   .item.has-shortage{position:relative;background:linear-gradient(to right,#fef4f1 0,#fff 80px,#fff 100%);border-left:4px solid var(--warn)}
@@ -536,6 +560,9 @@
       <div class="toolbar">
         <div class="search-box"><span class="search-icon">🔍</span>
           <input id="vendorSearch" placeholder="거래처명, 담당자로 검색" oninput="renderVendors()"></div>
+        <input type="file" id="vendorImportInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="importVendorsFromExcel(event)">
+        <button class="io-btn import" onclick="document.getElementById('vendorImportInput').click()" title="엑셀/CSV로 거래처 일괄 등록">📥 엑셀 업로드</button>
+        <button class="io-btn export" onclick="exportVendorsToExcel()" title="거래처 목록을 엑셀로 다운로드">📤 내보내기</button>
         <button class="add-btn" id="addVendorBtn" onclick="openVendorModal()" disabled>＋ 거래처 추가</button>
       </div>
       <div class="count-line" id="vendorCount"></div>
@@ -568,6 +595,9 @@
           <option value="">전체 재고대</option>
           <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option>
         </select>
+        <input type="file" id="itemImportInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="importItemsFromExcel(event)">
+        <button class="io-btn import" onclick="document.getElementById('itemImportInput').click()" title="엑셀/CSV로 품목 일괄 등록">📥 엑셀 업로드</button>
+        <button class="io-btn export" onclick="exportItemsToExcel()" title="품목 목록을 엑셀로 다운로드">📤 내보내기</button>
         <button class="add-btn" id="addItemBtn" onclick="openItemModal()" disabled>＋ 품목 추가</button>
       </div>
       <div class="count-line right" id="itemCount"></div>
@@ -1258,6 +1288,157 @@ function renderCalendar(){
 }
 
 // ===== 납기 목록 =====
+// ===== Phase 2: 가져오기/내보내기/토스트 =====
+
+function showToast(msg, type){
+  const old = document.getElementById('_toast');
+  if(old) old.remove();
+  const t = document.createElement('div');
+  t.id = '_toast';
+  t.className = 'toast ' + (type || '');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.classList.add('show'), 10);
+  setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=>t.remove(), 300); }, 2800);
+}
+
+function downloadFile(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
+
+function exportVendorsToExcel(){
+  if(typeof XLSX === 'undefined'){ showToast('엑셀 라이브러리 로딩 실패', 'error'); return; }
+  if(!store.vendors.length){ showToast('내보낼 거래처가 없습니다', 'error'); return; }
+  const rows = store.vendors.map(v=>({
+    '거래처명': v.name||'', '담당자': v.contact||'', '연락처': v.phone||'',
+    '주소': v.addr||'', '메모': v.memo||''
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{wch:24},{wch:14},{wch:16},{wch:30},{wch:30}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '거래처');
+  const today = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `광성_거래처_${today}.xlsx`);
+  showToast(`거래처 ${rows.length}건 내보냄`, 'success');
+}
+
+function exportItemsToExcel(){
+  if(typeof XLSX === 'undefined'){ showToast('엑셀 라이브러리 로딩 실패', 'error'); return; }
+  if(!store.items.length){ showToast('내보낼 품목이 없습니다', 'error'); return; }
+  const vmap = {};
+  store.vendors.forEach(v=>vmap[v.id]=v.name);
+  const rows = store.items.map(it=>({
+    '품목명': it.name||'', '상세규격': it.code||'',
+    '거래처': vmap[it.vendorId]||'', '재질': it.material||'', '색상': it.color||'',
+    '제품_구역': it.col||'', '제품_칸': it.cell||'',
+    '금형_구역': it.mzone||'', '금형_칸': it.mcell||''
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{wch:32},{wch:24},{wch:18},{wch:12},{wch:10},{wch:10},{wch:8},{wch:10},{wch:8}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '품목');
+  const today = new Date().toISOString().slice(0,10);
+  XLSX.writeFile(wb, `광성_품목_${today}.xlsx`);
+  showToast(`품목 ${rows.length}건 내보냄`, 'success');
+}
+
+function importVendorsFromExcel(evt){
+  if(!unlocked){ showToast('편집 모드로 전환 후 가능합니다 (자물쇠 해제)', 'error'); evt.target.value=''; return; }
+  const file = evt.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    try{
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+      let added = 0, skipped = 0;
+      rows.forEach(r=>{
+        const name = String(r['거래처명']||r['name']||r['이름']||'').trim();
+        if(!name){ skipped++; return; }
+        // 중복 체크 (같은 이름 있으면 skip)
+        if(store.vendors.some(v=>v.name === name)){ skipped++; return; }
+        store.vendors.push({
+          id: uid(), name,
+          contact: String(r['담당자']||r['contact']||'').trim(),
+          phone: String(r['연락처']||r['phone']||'').trim(),
+          addr: String(r['주소']||r['addr']||'').trim(),
+          memo: String(r['메모']||r['memo']||'').trim()
+        });
+        added++;
+      });
+      save(); renderVendors();
+      showToast(`거래처 ${added}건 추가, ${skipped}건 건너뜀`, 'success');
+    }catch(err){
+      console.error(err);
+      showToast('파일 읽기 실패: ' + err.message, 'error');
+    }
+    evt.target.value = '';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function importItemsFromExcel(evt){
+  if(!unlocked){ showToast('편집 모드로 전환 후 가능합니다 (자물쇠 해제)', 'error'); evt.target.value=''; return; }
+  const file = evt.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    try{
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+      const vByName = {};
+      store.vendors.forEach(v=>vByName[v.name]=v.id);
+      let added = 0, skipped = 0, autoVendor = 0;
+      rows.forEach(r=>{
+        const name = String(r['품목명']||r['name']||'').trim();
+        if(!name){ skipped++; return; }
+        // 중복 체크 (같은 품목명 + 상세규격 조합)
+        const code = String(r['상세규격']||r['code']||'').trim();
+        if(store.items.some(it=>it.name===name && (it.code||'')===code)){ skipped++; return; }
+        // 거래처 자동 매핑 (없으면 신규 생성)
+        const vendorName = String(r['거래처']||r['vendor']||'').trim();
+        let vendorId = '';
+        if(vendorName){
+          if(vByName[vendorName]) vendorId = vByName[vendorName];
+          else {
+            vendorId = uid();
+            store.vendors.push({id:vendorId, name:vendorName, contact:'', phone:'', addr:'', memo:'(엑셀 업로드 자동 생성)'});
+            vByName[vendorName] = vendorId;
+            autoVendor++;
+          }
+        }
+        store.items.push({
+          id: uid(), name, code, vendorId,
+          material: String(r['재질']||r['material']||'').trim(),
+          color: String(r['색상']||r['color']||'').trim(),
+          batch: '',
+          cell: String(r['제품_칸']||r['cell']||'').trim(),
+          col: String(r['제품_구역']||r['col']||'').trim(),
+          mcell: String(r['금형_칸']||r['mcell']||'').trim(),
+          mzone: String(r['금형_구역']||r['mzone']||'').trim(),
+          photos:[], moldPhotos:[]
+        });
+        added++;
+      });
+      save(); renderItems(); if(autoVendor) renderVendors();
+      const msg = `품목 ${added}건 추가, ${skipped}건 건너뜀` + (autoVendor?`, 거래처 ${autoVendor}건 자동생성`:'');
+      showToast(msg, 'success');
+    }catch(err){
+      console.error(err);
+      showToast('파일 읽기 실패: ' + err.message, 'error');
+    }
+    evt.target.value = '';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
 function renderDeliv(){
   const now=new Date(),mon=mondayOf(now),sun=new Date(mon);sun.setDate(mon.getDate()+6);
   const monStr=iso(mon),sunStr=iso(sun);
