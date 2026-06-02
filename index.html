@@ -1,0 +1,1900 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>광성특수고무공업사 업무 관리 시스템</title>
+<!-- Supabase JS Client (CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+  :root{
+    --bg:#f4f2ec; --surface:#ffffff; --ink:#1f1d18; --ink-soft:#6b6760;
+    --line:#e3ded3; --accent:#2f6f5e; --accent-soft:#e4efe9;
+    --blue:#2f5d8f; --blue-soft:#e6eef6; --warn:#b4541f; --warn-soft:#f6e8df;
+    --done:#9a968d; --today:#c9893a; --sidebar:#23312c; --sidebar-soft:#2f4138;
+    --shadow:0 1px 2px rgba(31,29,24,.06),0 8px 24px rgba(31,29,24,.05);
+    --radius:14px; --sidebar-w:248px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",-apple-system,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased}
+
+  /* ===== Top bar ===== */
+  .topbar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:12px;
+    background:var(--surface);border-bottom:1px solid var(--line);padding:11px 16px}
+  .menu-toggle{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--surface);
+    cursor:pointer;display:grid;place-items:center;flex-shrink:0;transition:.15s;padding:0}
+  .menu-toggle:hover{background:var(--bg)}
+  .menu-toggle .bars{width:18px;height:14px;position:relative}
+  .menu-toggle .bars span{position:absolute;left:0;width:100%;height:2px;background:var(--ink);border-radius:2px;transition:.2s}
+  .menu-toggle .bars span:nth-child(1){top:0}
+  .menu-toggle .bars span:nth-child(2){top:6px}
+  .menu-toggle .bars span:nth-child(3){top:12px}
+  .brand{display:flex;align-items:center;gap:10px;min-width:0}
+  .logo{width:34px;height:34px;border-radius:9px;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:17px;flex-shrink:0}
+  .brand-text h1{font-size:16px;font-weight:700;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .brand-text p{font-size:11.5px;color:var(--ink-soft)}
+  .topbar-spacer{flex:1}
+  .lock-btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:13px;font-weight:600;padding:9px 14px;border-radius:10px;cursor:pointer;transition:.15s;white-space:nowrap}
+  .lock-btn:hover{border-color:#c9c3b6}
+  .lock-btn.unlocked{background:var(--accent-soft);border-color:#bcdacd;color:var(--accent)}
+
+  /* ===== Sidebar ===== */
+  .sidebar{position:fixed;top:0;left:0;height:100vh;width:var(--sidebar-w);background:var(--sidebar);
+    z-index:50;transform:translateX(-100%);transition:transform .25s ease;display:flex;flex-direction:column;padding:14px 12px}
+  .sidebar.open{transform:translateX(0)}
+  .sidebar-head{display:flex;align-items:center;gap:10px;padding:8px 8px 16px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:10px}
+  .sidebar-head .logo{width:32px;height:32px;font-size:16px}
+  .sidebar-head h2{color:#fff;font-size:13.5px;font-weight:700;line-height:1.35}
+  .sidebar-head p{color:rgba(255,255,255,.55);font-size:11px;margin-top:1px}
+  .menu-group-label{color:rgba(255,255,255,.4);font-size:11px;font-weight:600;padding:12px 10px 6px;letter-spacing:.02em}
+  .menu-link{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:9px;color:rgba(255,255,255,.82);
+    font-size:14px;font-weight:600;cursor:pointer;transition:.15s;border:none;background:transparent;width:100%;text-align:left}
+  .menu-link:hover{background:var(--sidebar-soft);color:#fff}
+  .menu-link.active{background:var(--accent);color:#fff}
+  .menu-link .mico{font-size:16px;width:20px;text-align:center;flex-shrink:0}
+  .sidebar-footer{margin-top:auto;padding:12px 10px 4px;border-top:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.4);font-size:11px;line-height:1.6}
+
+  .scrim{position:fixed;inset:0;background:rgba(31,29,24,.4);z-index:40;opacity:0;pointer-events:none;transition:opacity .25s}
+  .scrim.show{opacity:1;pointer-events:auto}
+
+  .main{padding:18px 16px 60px;max-width:1040px;margin:0 auto}
+
+  .page-title{font-size:20px;font-weight:700;margin-bottom:4px;letter-spacing:-.02em}
+  .page-sub{font-size:13px;color:var(--ink-soft);margin-bottom:16px}
+
+  .mode-banner{font-size:12.5px;color:var(--ink-soft);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 14px;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--done);flex-shrink:0}
+  .mode-banner.unlocked .dot{background:var(--accent)}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:20px}
+
+  /* Calendar */
+  .cal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--line)}
+  .cal-title{font-size:16px;font-weight:700}
+  .cal-nav{display:flex;gap:6px;align-items:center}
+  .nav-btn{width:32px;height:32px;border-radius:8px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-size:15px;color:var(--ink);display:grid;place-items:center;transition:.15s}
+  .nav-btn:hover{background:var(--bg)}
+  .today-btn{border:1px solid var(--line);background:var(--surface);font-size:12.5px;font-weight:600;padding:0 12px;height:32px;border-radius:8px;cursor:pointer;color:var(--ink-soft)}
+  .today-btn:hover{background:var(--bg)}
+  .weekdays{display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--line)}
+  .weekdays div{text-align:center;font-size:12px;font-weight:600;padding:9px 0;color:var(--ink-soft)}
+  .weekdays div:first-child{color:#c0573f}
+  .weekdays div:last-child{color:#3f6ec0}
+  .days{display:grid;grid-template-columns:repeat(7,1fr)}
+  .day{min-height:62px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:6px 6px 4px;cursor:pointer;position:relative;transition:background .12s;display:flex;flex-direction:column;gap:3px}
+  .day:nth-child(7n){border-right:none}
+  .day:hover{background:#faf8f3}
+  .day.empty{background:#fbfaf6;cursor:default}
+  .day.empty:hover{background:#fbfaf6}
+  .day.selected{background:var(--accent-soft)}
+  .day-num{font-size:12.5px;font-weight:600;color:var(--ink)}
+  .day.sun .day-num{color:#c0573f}
+  .day.sat .day-num{color:#3f6ec0}
+  .day.today .day-num{background:var(--today);color:#fff;width:21px;height:21px;border-radius:50%;display:grid;place-items:center;font-size:11.5px}
+  .badge{font-size:10.5px;font-weight:600;line-height:1.3;background:var(--warn-soft);color:var(--warn);border-radius:5px;padding:1px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .badge.all-done{background:#eceae3;color:var(--done)}
+  .badge-more{font-size:10px;color:var(--ink-soft);padding-left:3px}
+
+  .list-head{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--line);flex-wrap:wrap;gap:10px}
+  .list-title{font-size:16px;font-weight:700;display:flex;align-items:center;gap:9px}
+  .range-pill{font-size:11.5px;font-weight:600;color:var(--ink-soft);background:var(--bg);border-radius:20px;padding:3px 10px}
+  .add-btn{background:var(--accent);color:#fff;border:none;font-size:13px;font-weight:600;padding:8px 14px;border-radius:9px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:.15s;white-space:nowrap}
+  .add-btn:hover{background:#27604f}
+  .add-btn:disabled{background:#cfcabe;cursor:not-allowed}
+
+  .item-list{padding:8px}
+  .empty-msg{padding:34px 18px;text-align:center;color:var(--ink-soft);font-size:13.5px}
+  .item{display:flex;align-items:flex-start;gap:12px;padding:13px 12px;border-radius:11px;transition:background .12s}
+  .item:hover{background:#faf8f3}
+  .item + .item{border-top:1px solid #f0ece2}
+  .check{width:22px;height:22px;border-radius:7px;border:2px solid #cdc7ba;background:var(--surface);cursor:pointer;flex-shrink:0;margin-top:1px;display:grid;place-items:center;transition:.15s;font-size:13px;color:transparent}
+  .check:hover{border-color:var(--accent)}
+  .check.checked{background:var(--accent);border-color:var(--accent);color:#fff}
+  .check.locked{cursor:not-allowed;opacity:.55}
+  .item-body{flex:1;min-width:0}
+  .item-top{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .vendor{font-size:14.5px;font-weight:700}
+  .due-tag{font-size:11.5px;font-weight:600;color:var(--warn);background:var(--warn-soft);border-radius:6px;padding:1px 7px}
+  .due-tag.soon{background:#fae3da;color:#a13f15}
+  .item-meta{font-size:13px;color:var(--ink-soft);margin-top:2px}
+  .item-memo{font-size:12.5px;color:var(--ink-soft);margin-top:3px;font-style:italic}
+  .item-loc{font-size:12px;color:var(--accent);font-weight:600;margin-top:3px}
+  .prod-progress{margin-top:8px;background:var(--bg);border-radius:9px;padding:8px 10px;font-size:12.5px;color:var(--ink);}
+  .prod-progress strong{color:var(--accent);}
+  .prod-progress .short{color:var(--warn);font-weight:700;}
+  .progress-bar{height:7px;background:#e9e2d4;border-radius:999px;overflow:hidden;margin-top:6px;}
+  .progress-fill{height:100%;background:var(--accent);border-radius:999px;}
+  .item.done .vendor,.item.done .item-meta{text-decoration:line-through;color:var(--done)}
+  .item.done .due-tag{background:#eceae3;color:var(--done)}
+  .item-actions{display:flex;gap:4px;flex-shrink:0}
+  .icon-btn{border:none;background:transparent;cursor:pointer;font-size:14px;padding:5px 7px;border-radius:7px;color:var(--ink-soft);transition:.12s}
+  .icon-btn:hover{background:#ece8de;color:var(--ink)}
+
+  .toolbar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+  .search-box{flex:1;min-width:180px;position:relative}
+  .search-box input{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 12px 10px 36px;font-size:14px;font-family:inherit;background:var(--surface);color:var(--ink)}
+  .search-box input:focus{outline:none;border-color:var(--accent)}
+  .search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--ink-soft);font-size:15px}
+  .filter-sel{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;background:var(--surface);color:var(--ink);cursor:pointer}
+  .count-line{font-size:12.5px;color:var(--ink-soft);margin-bottom:12px}
+  .count-line.right{text-align:right;margin-bottom:8px;font-size:12px}
+
+  /* 거래처 선택 드롭다운 (가나다순, 검색, 스크롤) */
+  .vendor-picker{position:relative;margin-bottom:14px;max-width:340px}
+  .vp-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;
+    border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:14px;font-weight:600;
+    padding:11px 14px;border-radius:10px;cursor:pointer;transition:.15s;text-align:left}
+  .vp-toggle:hover{border-color:#c9c3b6}
+  .vp-toggle .vp-cur{display:flex;align-items:center;gap:8px;min-width:0}
+  .vp-toggle .vp-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .vp-toggle .vp-name.placeholder{color:var(--ink-soft);font-weight:500}
+  .vp-toggle .vp-cnt{font-size:12px;color:var(--ink-soft);font-weight:600;flex-shrink:0}
+  .vp-toggle .vp-arrow{color:var(--ink-soft);font-size:12px;transition:transform .2s;flex-shrink:0}
+  .vendor-picker.open .vp-arrow{transform:rotate(180deg)}
+  .vp-panel{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:25;
+    background:var(--surface);border:1px solid var(--line);border-radius:12px;
+    box-shadow:0 10px 30px rgba(31,29,24,.15);overflow:hidden;display:none}
+  .vendor-picker.open .vp-panel{display:block}
+  .vp-search{position:relative;padding:10px;border-bottom:1px solid var(--line)}
+  .vp-search input{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 11px 9px 32px;font-size:13.5px;font-family:inherit;background:var(--bg);color:var(--ink)}
+  .vp-search input:focus{outline:none;border-color:var(--accent);background:var(--surface)}
+  .vp-search .ico{position:absolute;left:20px;top:50%;transform:translateY(-50%);color:var(--ink-soft);font-size:14px}
+  .vp-list{max-height:300px;overflow-y:auto;padding:6px}
+  .vp-opt{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:10px 12px;border-radius:8px;cursor:pointer;font-size:13.5px;color:var(--ink);transition:background .12s}
+  .vp-opt:hover{background:var(--bg)}
+  .vp-opt.active{background:var(--blue-soft);color:var(--blue);font-weight:700}
+  .vp-opt .vp-opt-cnt{font-size:12px;color:var(--ink-soft);flex-shrink:0}
+  .vp-opt.active .vp-opt-cnt{color:var(--blue)}
+  .vp-opt-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .vp-fixed{border-bottom:1px solid #f0ece2;margin-bottom:4px;padding-bottom:4px}
+  .vp-empty{padding:20px;text-align:center;color:var(--ink-soft);font-size:13px}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+  .prod-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column}
+  .thumb{aspect-ratio:4/3;background:#efece4;display:grid;place-items:center;position:relative;overflow:hidden}
+  .thumb img{width:100%;height:100%;object-fit:cover}
+  .thumb-empty{color:#b8b2a4;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:4px}
+  .thumb-empty span{font-size:24px}
+  .photo-count{position:absolute;right:8px;bottom:8px;background:rgba(31,29,24,.72);color:#fff;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px}
+  .prod-body{padding:13px 14px;flex:1;display:flex;flex-direction:column;gap:7px}
+  .prod-name{font-size:15px;font-weight:700;line-height:1.35}
+  .prod-code{font-size:11.5px;color:var(--ink-soft);font-family:"SF Mono",ui-monospace,monospace}
+  .spec-row{display:flex;flex-wrap:wrap;gap:5px}
+  .chip{font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:6px;background:var(--bg);color:var(--ink-soft)}
+  .chip.color{background:var(--blue-soft);color:var(--blue)}
+  .loc-line{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--accent);font-weight:600;margin-top:auto;padding-top:6px;border-top:1px solid #f0ece2}
+  .price-line{font-size:13px;color:var(--ink);font-weight:600}
+  .prod-actions{display:flex;gap:4px;padding:0 14px 12px}
+  .mini-btn{flex:1;border:1px solid var(--line);background:var(--surface);font-size:12.5px;font-weight:600;padding:7px;border-radius:8px;cursor:pointer;color:var(--ink-soft)}
+  .mini-btn:hover{background:var(--bg);color:var(--ink)}
+  .vendor-list{display:flex;flex-direction:column;gap:10px}
+  .vendor-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:15px 17px;display:flex;align-items:flex-start;gap:14px}
+  .vendor-avatar{width:42px;height:42px;border-radius:11px;background:var(--blue-soft);color:var(--blue);display:grid;place-items:center;font-size:17px;font-weight:700;flex-shrink:0}
+  .vendor-info{flex:1;min-width:0}
+  .vendor-name{font-size:15.5px;font-weight:700}
+  .vendor-meta{font-size:13px;color:var(--ink-soft);margin-top:3px;display:flex;flex-wrap:wrap;gap:4px 14px}
+  .vendor-memo{font-size:12.5px;color:var(--ink-soft);font-style:italic;margin-top:4px}
+  .empty-box{padding:50px 18px;text-align:center;color:var(--ink-soft);font-size:14px;background:var(--surface);border:1px dashed var(--line);border-radius:14px}
+
+  .overlay{position:fixed;inset:0;background:rgba(31,29,24,.42);display:none;align-items:flex-start;justify-content:center;padding:24px 16px;z-index:60;overflow-y:auto}
+  .overlay.show{display:flex}
+  .modal{background:var(--surface);border-radius:16px;width:100%;max-width:540px;padding:22px;box-shadow:0 12px 40px rgba(0,0,0,.2);margin:auto}
+  .modal h2{font-size:17px;font-weight:700;margin-bottom:16px}
+  .field{margin-bottom:13px}
+  .field label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-soft);margin-bottom:5px}
+  .field input,.field textarea,.field select{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:14px;font-family:inherit;color:var(--ink);background:var(--bg)}
+  .field input:focus,.field textarea:focus,.field select:focus{outline:none;border-color:var(--accent);background:var(--surface)}
+  .field textarea{resize:vertical;min-height:48px}
+  .field-row{display:flex;gap:11px}
+  .field-row .field{flex:1}
+  .loc-group{border:1px solid var(--line);border-radius:11px;padding:12px;background:var(--bg);margin-bottom:13px}
+  .loc-group .loc-label{font-size:12.5px;font-weight:600;color:var(--ink-soft);margin-bottom:8px}
+  .loc-fields{display:flex;gap:9px}
+  .loc-fields .field{flex:1;margin:0}
+  .loc-fields .field input,.loc-fields .field select{background:var(--surface)}
+  .mfg-group{border:1px solid var(--line);border-radius:11px;padding:12px;background:var(--accent-soft);margin-bottom:13px}
+  .mfg-group .mfg-label{font-size:12.5px;font-weight:700;color:var(--accent);margin-bottom:10px}
+  .mfg-group .field input{background:var(--surface)}
+  .photo-strip{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+  .photo-thumb{width:64px;height:64px;border-radius:9px;object-fit:cover;border:1px solid var(--line)}
+  .photo-wrap{position:relative;width:64px;height:64px}
+  .photo-wrap .del{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--warn);color:#fff;border:none;font-size:12px;cursor:pointer;display:grid;place-items:center;line-height:1}
+  .add-photo{width:64px;height:64px;border-radius:9px;border:1.5px dashed var(--line);background:var(--surface);cursor:pointer;display:grid;place-items:center;color:var(--ink-soft);font-size:22px}
+  .add-photo:hover{border-color:var(--accent);color:var(--accent)}
+  .modal-actions{display:flex;gap:9px;margin-top:10px}
+  .btn-primary,.btn-ghost{flex:1;padding:11px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:none}
+  .btn-primary{background:var(--accent);color:#fff}
+  .btn-primary:hover{background:#27604f}
+  .btn-ghost{background:var(--bg);color:var(--ink);border:1px solid var(--line)}
+  .btn-ghost:hover{background:#ece8de}
+
+  .hidden{display:none}
+
+  /* ===== 보관구역 페이지 ===== */
+  .loc-result-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:18px;margin-bottom:18px}
+  .loc-result-empty{padding:34px 18px;text-align:center;color:var(--ink-soft);font-size:13.5px;
+    background:var(--surface);border:1px dashed var(--line);border-radius:var(--radius);margin-bottom:18px}
+  .loc-result-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+  .loc-result-name{font-size:17px;font-weight:700;line-height:1.35}
+  .loc-result-code{font-size:12.5px;color:var(--ink-soft);font-family:"SF Mono",ui-monospace,monospace;margin-top:2px}
+  .loc-result-vendor{font-size:13px;color:var(--blue);font-weight:600;margin-top:4px}
+  .loc-big{display:flex;align-items:center;gap:14px;background:var(--accent-soft);
+    border-radius:12px;padding:16px 18px;margin-top:6px}
+  .loc-big.mold{background:#f0ece2}
+  .loc-big.missing{background:var(--warn-soft)}
+  .loc-big-ico{font-size:30px;flex-shrink:0}
+  .loc-big-text{flex:1;min-width:0}
+  .loc-big-label{font-size:12px;color:var(--ink-soft);font-weight:600;margin-bottom:3px}
+  .loc-big-value{font-size:20px;font-weight:700;color:var(--accent);letter-spacing:-.01em}
+  .loc-big.mold .loc-big-value{color:var(--ink)}
+  .loc-big.missing .loc-big-value{color:var(--warn);font-size:15px}
+  .loc-multi-hint{font-size:12px;color:var(--ink-soft);margin-top:10px}
+  .loc-list-mini{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+  .loc-mini-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);
+    border-radius:9px;cursor:pointer;border:1px solid transparent;transition:.12s}
+  .loc-mini-item:hover{border-color:var(--line);background:#fbfaf6}
+  .loc-mini-name{flex:1;font-size:13.5px;font-weight:600;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .loc-mini-code{font-size:11.5px;color:var(--ink-soft);flex-shrink:0}
+
+  .loc-hint{font-size:11.5px;color:var(--ink-soft);font-weight:500;margin-left:6px}
+
+  /* ===== 구역별 선반 보기 ===== */
+  .shelf-card{margin-bottom:18px}
+  .zone-picker-row{padding:4px 2px 14px}
+  .zone-picker-label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-soft);margin-bottom:9px}
+  .zone-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .zone-chip{min-width:38px;height:38px;padding:0 6px;border:1px solid var(--line);background:var(--surface);
+    border-radius:9px;font-size:14px;font-weight:700;color:var(--ink-soft);cursor:pointer;
+    display:inline-flex;align-items:center;justify-content:center;transition:.12s}
+  .zone-chip:hover{border-color:var(--accent);color:var(--accent)}
+  .zone-chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .zone-chip .chip-cnt{font-size:10px;font-weight:600;margin-left:3px;opacity:.7}
+
+  .shelf-empty{padding:30px 16px;text-align:center;color:var(--ink-soft);font-size:13px;
+    background:var(--bg);border:1px dashed var(--line);border-radius:12px}
+  .shelf-wrap{margin-top:4px}
+  .shelf-title{font-size:15px;font-weight:700;margin-bottom:12px;color:var(--ink);text-align:center}
+  .shelf-title .zcode{display:inline-flex;align-items:center;justify-content:center;
+    width:30px;height:30px;border-radius:8px;background:var(--accent);color:#fff;margin-right:8px}
+  .shelf-unit{border:2px solid #b7a98c;border-radius:10px;overflow:hidden;background:#efe9da;
+    box-shadow:0 2px 10px rgba(31,29,24,.1);max-width:560px;margin:0 auto}
+  .shelf-floor{display:flex;align-items:stretch;border-bottom:2px solid #b7a98c;min-height:110px}
+  .shelf-floor:last-child{border-bottom:none}
+  .shelf-floor-label{flex-shrink:0;width:62px;background:#d9cfb6;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;font-weight:700;color:#6b5d3e;font-size:13px;
+    border-right:2px solid #b7a98c;gap:1px}
+  .shelf-floor-label .fl-sub{font-size:10px;font-weight:600;opacity:.75}
+  .shelf-floor-body{flex:1;padding:10px 12px;display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start;align-content:flex-start;background:#fbf8f0}
+  .shelf-floor-body.empty{color:var(--ink-soft);font-size:11.5px;font-style:italic;opacity:.7;align-items:center;align-content:center}
+  .shelf-chip{background:var(--surface);border:1px solid var(--line);border-radius:7px;
+    padding:4px 9px;font-size:12px;font-weight:600;color:var(--ink);max-width:100%}
+  .shelf-chip .sc-vendor{color:var(--blue);font-weight:600;font-size:10.5px;margin-left:4px}
+  .shelf-floornum{font-size:18px;line-height:1}
+
+  /* ===== 제품 마스터 ===== */
+  .master-list{display:flex;flex-direction:column;gap:8px}
+  .master-row{display:flex;align-items:center;gap:13px;padding:11px 14px;background:var(--surface);
+    border:1px solid var(--line);border-radius:11px;cursor:pointer;transition:.12s;box-shadow:var(--shadow)}
+  .master-row:hover{border-color:var(--accent);transform:translateY(-1px)}
+  .master-row-thumb{width:54px;height:54px;border-radius:9px;object-fit:cover;border:1px solid var(--line);flex-shrink:0;background:var(--bg)}
+  .master-row-thumb.empty{display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--ink-soft);opacity:.5}
+  .master-row-main{flex:1;min-width:0}
+  .master-row-name{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .master-row-sub{font-size:12.5px;color:var(--ink-soft);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .master-row-vendor{color:var(--blue);font-weight:600}
+  .master-row-arrow{color:var(--ink-soft);font-size:18px;flex-shrink:0}
+  .master-empty{padding:40px 18px;text-align:center;color:var(--ink-soft);font-size:13.5px;
+    background:var(--surface);border:1px dashed var(--line);border-radius:var(--radius)}
+
+  /* 상세 팝업 */
+  .master-modal{max-width:680px;position:relative;padding-top:20px}
+  .master-close{position:absolute;top:12px;right:14px;width:34px;height:34px;border:none;background:var(--bg);
+    border-radius:8px;font-size:22px;line-height:1;color:var(--ink-soft);cursor:pointer;z-index:2}
+  .master-close:hover{background:var(--line);color:var(--ink)}
+  .md-header{display:flex;gap:16px;align-items:flex-start;margin-bottom:18px;padding-right:40px}
+  .md-photo{width:120px;height:120px;border-radius:12px;object-fit:cover;border:1px solid var(--line);flex-shrink:0;background:var(--bg);cursor:pointer}
+  .md-photo.empty{display:flex;align-items:center;justify-content:center;font-size:32px;color:var(--ink-soft);opacity:.4}
+  .md-head-text{flex:1;min-width:0;padding-top:4px}
+  .md-name{font-size:21px;font-weight:800;line-height:1.25}
+  .md-code{font-size:12.5px;color:var(--ink-soft);font-family:"SF Mono",ui-monospace,monospace;margin-top:3px}
+  .md-vendor{display:inline-block;font-size:13.5px;color:var(--blue);font-weight:700;margin-top:8px;
+    background:var(--blue-soft);padding:3px 11px;border-radius:20px}
+  .md-section{margin-bottom:16px}
+  .md-section-title{font-size:12.5px;font-weight:700;color:var(--accent);margin-bottom:9px;
+    display:flex;align-items:center;gap:6px;padding-bottom:6px;border-bottom:2px solid var(--accent-soft)}
+  .md-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .md-cell{background:var(--bg);border-radius:9px;padding:9px 12px}
+  .md-cell.full{grid-column:1 / -1}
+  .md-cell-label{font-size:11px;color:var(--ink-soft);font-weight:600;margin-bottom:3px}
+  .md-cell-value{font-size:14.5px;font-weight:600;color:var(--ink);word-break:break-word}
+  .md-cell-value.big{font-size:16px;color:var(--accent);font-weight:700}
+  .md-cell-value.muted{color:var(--ink-soft);font-weight:500;font-style:italic}
+  .md-note{background:#fffbe9;border:1px solid #f0e3b0;border-radius:10px;padding:12px 14px;
+    font-size:13.5px;line-height:1.6;white-space:pre-wrap;color:#5b4e22;word-break:break-word}
+  .md-note.empty{color:var(--ink-soft);font-style:italic;background:var(--bg);border-color:var(--line)}
+  .md-photos{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .md-photos img{width:80px;height:80px;border-radius:8px;object-fit:cover;border:1px solid var(--line);cursor:pointer}
+  .md-edit-btn{display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:600;
+    border:1px solid var(--line);background:var(--surface);padding:8px 14px;border-radius:9px;cursor:pointer;color:var(--ink)}
+  .md-edit-btn:hover{background:var(--bg)}
+
+  /* 사진 큰 보기 뷰어 */
+  .photo-viewer-overlay{background:rgba(20,18,14,.92);align-items:center;justify-content:center;flex-direction:row;z-index:200}
+  .pv-img{max-width:88vw;max-height:82vh;border-radius:8px;object-fit:contain;box-shadow:0 8px 40px rgba(0,0,0,.5)}
+  .pv-close{position:absolute;top:18px;right:20px;width:42px;height:42px;border:none;background:rgba(255,255,255,.14);
+    color:#fff;font-size:26px;border-radius:10px;cursor:pointer;line-height:1}
+  .pv-close:hover{background:rgba(255,255,255,.26)}
+  .pv-nav{position:absolute;top:50%;transform:translateY(-50%);width:48px;height:64px;border:none;
+    background:rgba(255,255,255,.14);color:#fff;font-size:34px;border-radius:10px;cursor:pointer;line-height:1}
+  .pv-nav:hover{background:rgba(255,255,255,.26)}
+  .pv-prev{left:16px}.pv-next{right:16px}
+  .pv-count{position:absolute;bottom:22px;left:50%;transform:translateX(-50%);color:#fff;
+    background:rgba(0,0,0,.5);padding:5px 14px;border-radius:20px;font-size:13px}
+
+  @media(min-width:980px){
+    .scrim{display:none}
+    .sidebar{box-shadow:none}
+    body.sidebar-open .sidebar{transform:translateX(0)}
+    body.sidebar-open .main-wrap{margin-left:var(--sidebar-w)}
+    .main-wrap{transition:margin-left .25s ease}
+    .menu-toggle{display:grid}
+  }
+  @media(max-width:560px){
+    .main{padding:14px 10px 60px}
+    .day{min-height:52px;padding:4px 3px}
+    .badge{font-size:9.5px;padding:1px 3px}
+    .grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+    .field-row,.loc-fields{flex-direction:column;gap:0}
+    .loc-fields .field{margin-bottom:9px}
+    .brand-text h1{font-size:14px}
+    .topbar-spacer{flex:1}
+  }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-head">
+    <div class="logo">◳</div>
+    <div>
+      <h2>광성특수고무공업사</h2>
+      <p>업무 관리 시스템</p>
+    </div>
+  </div>
+  <div class="menu-group-label">메뉴</div>
+  <button class="menu-link active" id="mlSchedule" onclick="navTo('schedule')"><span class="mico">📅</span> 일정</button>
+  <button class="menu-link" id="mlMaster" onclick="navTo('master')"><span class="mico">⭐</span> 제품 마스터</button>
+  <button class="menu-link" id="mlVendors" onclick="navTo('vendors')"><span class="mico">🏢</span> 거래처</button>
+  <button class="menu-link" id="mlItems" onclick="navTo('items')"><span class="mico">📦</span> 품목</button>
+  <button class="menu-link" id="mlProductLoc" onclick="navTo('productLoc')"><span class="mico">📍</span> 제품 보관구역</button>
+  <button class="menu-link" id="mlMoldLoc" onclick="navTo('moldLoc')"><span class="mico">🛠</span> 금형 보관구역</button>
+  <div class="sidebar-footer">광성특수고무공업사<br>업무 관리 시스템 · 데모판</div>
+</aside>
+<div class="scrim" id="scrim" onclick="closeSidebar()"></div>
+
+<!-- Top bar -->
+<div class="main-wrap">
+  <div class="topbar">
+    <button class="menu-toggle" onclick="toggleSidebar()" aria-label="메뉴 열기">
+      <span class="bars"><span></span><span></span><span></span></span>
+    </button>
+    <div class="brand">
+      <div class="logo">◳</div>
+      <div class="brand-text">
+        <h1>광성특수고무공업사 업무 관리 시스템</h1>
+        <p id="topSub">납기 일정</p>
+      </div>
+    </div>
+    <div class="topbar-spacer"></div>
+    <button class="lock-btn" id="lockBtn" onclick="toggleLock()">
+      <span id="lockIcon">🔒</span><span id="lockLabel">관리자키</span>
+    </button>
+  </div>
+
+  <div class="main">
+    <div class="mode-banner" id="modeBanner">
+      <span class="dot"></span>
+      <span id="modeText">열람 모드입니다. 보기만 가능하며, 수정하려면 관리자키를 입력하세요.</span>
+    </div>
+
+    <!-- ===== 제품 마스터 ===== -->
+    <div id="masterPage" class="hidden">
+      <div class="page-title">제품 마스터</div>
+      <div class="page-sub">제품명을 검색하고 클릭하면 생산에 필요한 모든 정보를 한눈에 볼 수 있습니다</div>
+      <div class="toolbar">
+        <div class="search-box"><span class="search-icon">🔍</span>
+          <input id="masterSearch" placeholder="제품명, 코드, 거래처로 검색" oninput="renderMaster()"></div>
+        <select class="filter-sel" id="masterVendorFilter" onchange="renderMaster()">
+          <option value="">전체 거래처</option>
+        </select>
+      </div>
+      <div class="count-line right" id="masterCount"></div>
+      <div id="masterList"></div>
+    </div>
+
+    <!-- ===== 일정 ===== -->
+    <div id="schedulePage">
+      <div class="page-title">일정</div>
+      <div class="page-sub">월간 납기 캘린더와 금주 납기 목록</div>
+      <div class="card">
+        <div class="cal-head">
+          <div class="cal-title" id="calTitle"></div>
+          <div class="cal-nav">
+            <button class="today-btn" onclick="goToday()">오늘</button>
+            <button class="nav-btn" onclick="changeMonth(-1)">‹</button>
+            <button class="nav-btn" onclick="changeMonth(1)">›</button>
+          </div>
+        </div>
+        <div class="weekdays"><div>일</div><div>월</div><div>화</div><div>수</div><div>목</div><div>금</div><div>토</div></div>
+        <div class="days" id="days"></div>
+      </div>
+      <div class="card">
+        <div class="list-head">
+          <div class="list-title">금주 납기 목록 <span class="range-pill" id="rangePill"></span></div>
+          <button class="add-btn" id="addDelivBtn" onclick="openDelivModal()" disabled>＋ 항목 추가</button>
+        </div>
+        <div class="item-list" id="delivList"></div>
+      </div>
+    </div>
+
+    <!-- ===== 거래처 ===== -->
+    <div id="vendorsPage" class="hidden">
+      <div class="page-title">거래처</div>
+      <div class="page-sub">거래처 데이터를 등록하고 수정합니다</div>
+      <div class="toolbar">
+        <div class="search-box"><span class="search-icon">🔍</span>
+          <input id="vendorSearch" placeholder="거래처명, 담당자로 검색" oninput="renderVendors()"></div>
+        <button class="add-btn" id="addVendorBtn" onclick="openVendorModal()" disabled>＋ 거래처 추가</button>
+      </div>
+      <div class="count-line" id="vendorCount"></div>
+      <div id="vendorList"></div>
+    </div>
+
+    <!-- ===== 품목 ===== -->
+    <div id="itemsPage" class="hidden">
+      <div class="page-title">품목</div>
+      <div class="page-sub">거래처별로 품목을 구분해 관리합니다</div>
+      <div class="vendor-picker" id="vendorPicker">
+        <button class="vp-toggle" onclick="toggleVendorPicker(event)">
+          <span class="vp-cur">
+            <span class="vp-name" id="vpCurName">거래처 검색</span>
+          </span>
+          <span class="vp-arrow">▼</span>
+        </button>
+        <div class="vp-panel">
+          <div class="vp-search">
+            <span class="ico">🔍</span>
+            <input id="vpSearch" placeholder="거래처 검색" oninput="renderVendorOptions()" onclick="event.stopPropagation()">
+          </div>
+          <div class="vp-list" id="vpList"></div>
+        </div>
+      </div>
+      <div class="toolbar">
+        <div class="search-box"><span class="search-icon">🔍</span>
+          <input id="itemSearch" placeholder="품목명, 코드, 색상으로 검색" oninput="renderItems()"></div>
+        <select class="filter-sel" id="zoneFilter" onchange="renderItems()">
+          <option value="">전체 재고대</option>
+          <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option>
+        </select>
+        <button class="add-btn" id="addItemBtn" onclick="openItemModal()" disabled>＋ 품목 추가</button>
+      </div>
+      <div class="count-line right" id="itemCount"></div>
+      <div id="itemGrid"></div>
+    </div>
+
+    <!-- ===== 제품 보관구역 ===== -->
+    <div id="productLocPage" class="hidden">
+      <div class="page-title">제품 보관구역</div>
+      <div class="page-sub">거래처와 품목을 선택하면 보관위치가 표시됩니다</div>
+
+      <div class="vendor-picker" id="vendorPicker_p">
+        <button class="vp-toggle" onclick="toggleLocVendorPicker('p',event)">
+          <span class="vp-cur">
+            <span class="vp-name placeholder" id="vpCurName_p">거래처 선택</span>
+          </span>
+          <span class="vp-arrow">▼</span>
+        </button>
+        <div class="vp-panel">
+          <div class="vp-search">
+            <span class="ico">🔍</span>
+            <input id="vpSearch_p" placeholder="거래처 검색" oninput="renderLocVendorOptions('p')" onclick="event.stopPropagation()">
+          </div>
+          <div class="vp-list" id="vpList_p"></div>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <div class="search-box"><span class="search-icon">🔍</span>
+          <input id="locItemSearch_p" placeholder="품목명 또는 코드로 검색" oninput="renderLocPage('product')"></div>
+      </div>
+
+      <div id="locResult_p"></div>
+    </div>
+
+    <!-- ===== 금형 보관구역 ===== -->
+    <div id="moldLocPage" class="hidden">
+      <div class="page-title">금형 보관구역</div>
+      <div class="page-sub">거래처와 품목을 선택하면 금형 보관위치가 표시됩니다</div>
+
+      <div class="vendor-picker" id="vendorPicker_m">
+        <button class="vp-toggle" onclick="toggleLocVendorPicker('m',event)">
+          <span class="vp-cur">
+            <span class="vp-name placeholder" id="vpCurName_m">거래처 선택</span>
+          </span>
+          <span class="vp-arrow">▼</span>
+        </button>
+        <div class="vp-panel">
+          <div class="vp-search">
+            <span class="ico">🔍</span>
+            <input id="vpSearch_m" placeholder="거래처 검색" oninput="renderLocVendorOptions('m')" onclick="event.stopPropagation()">
+          </div>
+          <div class="vp-list" id="vpList_m"></div>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <div class="search-box"><span class="search-icon">🔍</span>
+          <input id="locItemSearch_m" placeholder="품목명 또는 코드로 검색" oninput="renderLocPage('mold')"></div>
+      </div>
+
+      <div id="locResult_m"></div>
+
+      <!-- A~Z 구역 + 5층 선반 뷰 -->
+      <div class="card shelf-card">
+        <div class="list-head">
+          <div class="list-title">🗄 구역별 선반 보기</div>
+        </div>
+        <div class="zone-picker-row">
+          <label class="zone-picker-label">구역 선택</label>
+          <div class="zone-chips" id="zoneChips"></div>
+        </div>
+        <div id="shelfView"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- 납기 모달 -->
+<div class="overlay" id="delivOverlay">
+  <div class="modal" style="max-width:400px">
+    <h2 id="delivModalTitle">납기 항목 추가</h2>
+    <div class="field"><label>발주처</label><select id="d_vendor"><option value="">직접 입력 또는 선택</option></select></div>
+    <div class="field"><label>발주처 (직접 입력 시)</label><input id="d_vendorText" placeholder="목록에 없으면 여기 입력"></div>
+    <div class="field"><label>품목</label><select id="d_item"><option value="">직접 입력 또는 선택</option></select></div>
+    <div class="field"><label>품목 (직접 입력 시)</label><input id="d_itemText" placeholder="목록에 없으면 여기 입력"></div>
+    <div class="field-row">
+      <div class="field"><label>납품수량</label><input id="d_qty" type="number" placeholder="예) 10000"></div>
+      <div class="field"><label>납기일</label><input id="d_due" type="date"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>현재재고</label><input id="d_stock" type="number" placeholder="예) 4000"></div>
+      <div class="field"><label>작업자</label><input id="d_worker" placeholder="예) A"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>목표생산수량</label><input id="d_target" type="number" placeholder="예) 6000"></div>
+      <div class="field"><label>현재 생산수량</label><input id="d_produced" type="number" placeholder="예) 1000"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>생산상태</label><select id="d_prodStatus"><option>대기</option><option>작업중</option><option>완료</option></select></div>
+      <div class="field"><label>부족수량</label><input id="d_shortage" readonly placeholder="자동계산"></div>
+    </div>
+    <div class="field"><label>비고 / 메모</label><textarea id="d_memo" placeholder="예) 오전 도착 요청"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeDelivModal()">취소</button>
+      <button class="btn-primary" onclick="saveDeliv()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 품목 모달 -->
+<div class="overlay" id="itemOverlay">
+  <div class="modal">
+    <h2 id="itemModalTitle">품목 추가</h2>
+    <div class="field-row">
+      <div class="field"><label>품목코드</label><input id="i_code" placeholder="예) BRK-A-001"></div>
+      <div class="field"><label>거래처</label><select id="i_vendor"><option value="">선택 안 함</option></select></div>
+    </div>
+    <div class="field"><label>품목명</label><input id="i_name" placeholder="예) 알루미늄 브래킷 A형"></div>
+    <div class="field-row">
+      <div class="field"><label>규격 / 사양</label><input id="i_spec" placeholder="예) 120×80×3mm"></div>
+      <div class="field"><label>색상</label><input id="i_color" placeholder="예) 무광 블랙"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>단가</label><input id="i_price" placeholder="예) 3,200"></div>
+      <div class="field"><label>단위</label><input id="i_unit" placeholder="예) 개"></div>
+    </div>
+    <div class="loc-group">
+      <div class="loc-label">📍 제품 보관위치 <span class="loc-hint">재고대 1~12</span></div>
+      <div class="loc-fields">
+        <div class="field"><label>재고대</label><select id="i_zone"><option value="">-</option>
+          <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option></select></div>
+        <div class="field"><label>열</label><input id="i_col" type="number" min="1" placeholder="1"></div>
+        <div class="field"><label>칸 (위에서)</label><input id="i_cell" type="number" min="1" placeholder="3"></div>
+      </div>
+    </div>
+    <div class="loc-group">
+      <div class="loc-label">🛠 금형 보관위치 <span class="loc-hint">구역 A~Z, 각 1~5층</span></div>
+      <div class="loc-fields">
+        <div class="field"><label>구역</label><select id="i_mzone"><option value="">-</option>
+          <option>A</option><option>B</option><option>C</option><option>D</option><option>E</option><option>F</option><option>G</option><option>H</option><option>I</option><option>J</option><option>K</option><option>L</option><option>M</option><option>N</option><option>O</option><option>P</option><option>Q</option><option>R</option><option>S</option><option>T</option><option>U</option><option>V</option><option>W</option><option>X</option><option>Y</option><option>Z</option></select></div>
+        <div class="field"><label>층</label><select id="i_mfloor"><option value="">-</option>
+          <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div>
+        <div class="field"><label>칸 (선택)</label><input id="i_mcell" type="number" min="1" placeholder="예) 2"></div>
+      </div>
+    </div>
+    <div class="field"><label>제품 사진 (여러 장 가능)</label>
+      <div class="photo-strip" id="photoStrip"></div>
+      <input type="file" id="photoInput" accept="image/*" multiple style="display:none" onchange="addPhotos(event)"></div>
+    <div class="field"><label>금형 사진 (여러 장 가능)</label>
+      <div class="photo-strip" id="moldPhotoStrip"></div>
+      <input type="file" id="moldPhotoInput" accept="image/*" multiple style="display:none" onchange="addMoldPhotos(event)"></div>
+
+    <div class="mfg-group">
+      <div class="mfg-label">⚙️ 제조 정보</div>
+      <div class="field-row">
+        <div class="field"><label>원재료</label><input id="i_material" placeholder="예) 실리콘 60"></div>
+        <div class="field"><label>색상 / 배합</label><input id="i_mfgcolor" placeholder="예) 흰색"></div>
+      </div>
+      <div class="field"><label>배치 방법</label><input id="i_batch" placeholder="예) 35g × 4줄"></div>
+      <div class="field-row">
+        <div class="field"><label>가공 온도</label><input id="i_temp" placeholder="예) 173도"></div>
+        <div class="field"><label>가공 시간</label><input id="i_time" placeholder="예) 180초"></div>
+      </div>
+    </div>
+
+    <div class="field"><label>작업 메모 / 노하우</label><textarea id="i_worknote" placeholder="불량 원인, 불량 예방 팁, 이 제품이 실제로 쓰이는 곳(가공 정밀도 감) 등을 자유롭게 적어주세요" rows="4"></textarea></div>
+    <div class="field"><label>불량품 / 참고 사진 (여러 장 가능)</label>
+      <div class="photo-strip" id="defectPhotoStrip"></div>
+      <input type="file" id="defectPhotoInput" accept="image/*" multiple style="display:none" onchange="addDefectPhotos(event)"></div>
+
+    <div class="field"><label>비고 / 메모</label><textarea id="i_memo" placeholder="예) 재고 소진 임박"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeItemModal()">취소</button>
+      <button class="btn-primary" onclick="saveItem()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 거래처 모달 -->
+<div class="overlay" id="vendorOverlay">
+  <div class="modal">
+    <h2 id="vendorModalTitle">거래처 추가</h2>
+    <div class="field"><label>거래처명</label><input id="v_name" placeholder="예) (주)대한정밀"></div>
+    <div class="field-row">
+      <div class="field"><label>담당자</label><input id="v_contact" placeholder="예) 김영수 과장"></div>
+      <div class="field"><label>연락처</label><input id="v_phone" placeholder="예) 010-1234-5678"></div>
+    </div>
+    <div class="field"><label>주소</label><input id="v_addr" placeholder="예) 경기도 부천시 …"></div>
+    <div class="field"><label>비고 / 메모</label><textarea id="v_memo" placeholder="예) 결제 조건 월말 정산"></textarea></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeVendorModal()">취소</button>
+      <button class="btn-primary" onclick="saveVendor()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 제품 마스터 상세 팝업 ===== -->
+<div class="overlay" id="masterDetailOverlay">
+  <div class="modal master-modal">
+    <button class="master-close" onclick="closeMasterDetail()">×</button>
+    <div id="masterDetailBody"></div>
+  </div>
+</div>
+
+<!-- ===== 사진 큰 보기 뷰어 ===== -->
+<div class="overlay photo-viewer-overlay" id="photoViewerOverlay" onclick="closePhotoViewer()">
+  <button class="pv-close" onclick="closePhotoViewer()">×</button>
+  <button class="pv-nav pv-prev" onclick="event.stopPropagation();pvMove(-1)">‹</button>
+  <img class="pv-img" id="pvImg" src="" alt="" onclick="event.stopPropagation()">
+  <button class="pv-nav pv-next" onclick="event.stopPropagation();pvMove(1)">›</button>
+  <div class="pv-count" id="pvCount"></div>
+</div>
+
+<script>
+const ADMIN_KEY="1234";
+const STORE_KEY="kwangsung_work_demo_v1";
+let store={deliveries:[],items:[],vendors:[]};
+let unlocked=false, currentPage="schedule";
+let viewYear,viewMonth,selectedDate=null;
+let vendorFilter="";  // 품목 화면 거래처별 필터 (""=전체)
+let locVendor={p:"",m:""};  // 보관구역 페이지: 제품(p)/금형(m) 각각 거래처 선택
+let selectedZone="";        // 금형 선반 보기: 현재 선택된 구역 (A~Z)
+const SHELF_ZONES="ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");  // 구역 목록
+const SHELF_FLOORS=5;       // 선반 층 수 (아래 1층 → 위 5층)
+let editingDelivId=null,editingItemId=null,editingVendorId=null;
+let tempPhotos=[];
+let tempMoldPhotos=[];
+let tempDefectPhotos=[];
+
+// ===== Supabase 설정 =====
+const SUPABASE_URL = 'https://wgarlhwmjhybiowvpsam.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_7YEV2ROodXWxuWfM5AkaAg_jB74i2IY';
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let saveTimer = null;
+let isLoading = false;
+
+async function load(){
+  isLoading = true;
+  try {
+    const { data, error } = await supabaseClient
+      .from('store_snapshot')
+      .select('data')
+      .eq('id', 1)
+      .single();
+    if (error && error.code !== 'PGRST116') {
+      console.error('[Supabase load 오류]', error);
+      store = seed();
+    } else if (data) {
+      store = data.data;
+      console.log('[Supabase] 데이터 로드 완료', store);
+    } else {
+      store = seed();
+      console.log('[Supabase] 초기 데이터(seed) 생성');
+    }
+  } catch (e) {
+    console.error('[load 예외]', e);
+    store = seed();
+  } finally {
+    isLoading = false;
+  }
+}
+
+async function save(){
+  if (isLoading) return;
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    try {
+      const { error } = await supabaseClient
+        .from('store_snapshot')
+        .upsert({ id: 1, data: store, updated_at: new Date().toISOString() });
+      if (error) {
+        console.error('[Supabase save 오류]', error);
+        alert('서버 저장 실패: ' + error.message);
+      } else {
+        console.log('[Supabase] 저장 완료', new Date().toLocaleTimeString());
+      }
+    } catch (e) {
+      console.error('[save 예외]', e);
+    }
+  }, 500);
+}
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function iso(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function mondayOf(date){const d=new Date(date);const day=d.getDay();const diff=(day===0?-6:1-day);d.setDate(d.getDate()+diff);d.setHours(0,0,0,0);return d;}
+function fmtRange(mon){const sun=new Date(mon);sun.setDate(mon.getDate()+6);return `${mon.getMonth()+1}/${mon.getDate()} ~ ${sun.getMonth()+1}/${sun.getDate()}`;}
+function esc(s){return String(s||"").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function num(v){const n=Number(String(v??"").replace(/,/g,""));return isNaN(n)?0:n;}
+function fmtNum(v){return num(v).toLocaleString('ko-KR');}
+function calcShortage(){
+  const target=num(document.getElementById('d_target')?.value);
+  const produced=num(document.getElementById('d_produced')?.value);
+  const el=document.getElementById('d_shortage');
+  if(el) el.value=Math.max(target-produced,0).toLocaleString('ko-KR');
+}
+function calcNeedProduction(){
+  const qty=num(document.getElementById('d_qty')?.value);
+  const stock=num(document.getElementById('d_stock')?.value);
+  const target=document.getElementById('d_target');
+  if(target && (!target.value || editingDelivId===null)) target.value=Math.max(qty-stock,0);
+  calcShortage();
+}
+
+function seed(){
+  // 거래처 269개 일괄 등록됨 (이름만, 나머지 정보는 비어있음)
+  // 관리자키(1234)로 잠금 해제 후 거래처 정보 보완 / 품목·일정 등록하세요.
+  return {
+    vendors:[
+      {id:"v0001",name:"(주) 모닝센스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0002",name:"(주) 아이비아이",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0003",name:"(주) 엠이피",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0004",name:"(주) 이엘엔터프라이즈",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0005",name:"(주) 진영전자",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0006",name:"(주) 케이시스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0007",name:"(주) 클래시스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0008",name:"(주)서진시스템",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0009",name:"(주)에스지케이",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0010",name:"(주)엘피스메디칼",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0011",name:"(주)이랜시스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0012",name:"(주)클로우",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0013",name:"(주)파인셈",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0014",name:"ARK MTECH",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0015",name:"IDnComm",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0016",name:"KM digitech",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0017",name:"PJB 주식회사",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0018",name:"SJ테크",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0019",name:"VORTEX WATER TECHNOGY",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0020",name:"WINDTECH VIET NAM TECHNOLOGY JOINT STOCK COMPANY",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0021",name:"[주] 지노아이앤티",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0022",name:"[주] 휴바이오메드",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0023",name:"[주]셀렉월드",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0024",name:"[주]엄마",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0025",name:"가나실업",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0026",name:"가온일렉스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0027",name:"갤럭시아 일렉트로닉스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0028",name:"갤럭시아디바이스 주식회사",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0029",name:"거산",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0030",name:"경인정밀기계",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0031",name:"구성정밀",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0032",name:"그레이프이펙트",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0033",name:"금강정밀",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0034",name:"남일산업",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0035",name:"네오네온엘이디라이팅",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0036",name:"노바텍",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0037",name:"뉴링크넷",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0038",name:"다미소",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0039",name:"다스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0040",name:"다올에이스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0041",name:"대동초음파",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0042",name:"대림통상 [주] 증평공장",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0043",name:"대산",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0044",name:"대성정밀",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0045",name:"대아하이테크(주)",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0046",name:"대영데커원",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0047",name:"대원",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0048",name:"대원가전",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0049",name:"대원시스템",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0050",name:"대윤전자",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0051",name:"대준케미칼",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0052",name:"대지오토모티브 (주)",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0053",name:"대한정밀",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0054",name:"대한특수고무",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0055",name:"대현정밀",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0056",name:"대형솔루텍",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0057",name:"더비트",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0058",name:"독스위시",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0059",name:"동문에스앤에프 주식회사",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0060",name:"동양폴리테크",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0061",name:"동원금속",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0062",name:"동화금속",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0063",name:"동화프린텍",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0064",name:"두잉썸",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0065",name:"두텍",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0066",name:"디붐",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0067",name:"디앤디파트너스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0068",name:"디에스퓨어셀",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0069",name:"디에이테크놀로지",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0070",name:"디엔케이",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0071",name:"디오테크닉스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0072",name:"디오텍",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0073",name:"라이토리",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0074",name:"레하텍",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0075",name:"리비닉스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0076",name:"리빙센스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0077",name:"리젠아이",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0078",name:"마누스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0079",name:"메가노스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0080",name:"메카트로",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0081",name:"명성우레탄",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0082",name:"미주산업전자(주)",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0083",name:"민성테크",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0084",name:"민호디지탈 주식회사",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0085",name:"바이오스페이스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0086",name:"바이온텍",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0087",name:"범진아이엔디[주]",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0088",name:"베스코",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0089",name:"베이직테크",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0090",name:"보령주방",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0091",name:"보성텍",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0092",name:"비스토스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0093",name:"비에스앤시스템즈 주식회사",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0094",name:"비엘씨",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0095",name:"비젼플렉스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0096",name:"비즈에스코스메틱",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0097",name:"비지에스코스메틱(주)",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0098",name:"빛담",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0099",name:"삼명엔지니어링",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0100",name:"삼정전원",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0101",name:"상원",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0102",name:"상현화스너",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0103",name:"서산상사",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0104",name:"서원테크",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0105",name:"선셰프",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0106",name:"선일고무공업사",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0107",name:"성보금속",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0108",name:"성현시스템",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0109",name:"성호정밀",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0110",name:"세건",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0111",name:"세나스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0112",name:"세명백트론",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0113",name:"세븐스마일케어",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0114",name:"세영아이앤씨",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0115",name:"세원하이텍",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0116",name:"세진TLS",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0117",name:"세진테크",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0118",name:"소슬이엔지",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0119",name:"수플러스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0120",name:"스킨렉스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0121",name:"시안시스템",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0122",name:"신성전자",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0123",name:"신세계통상",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0124",name:"신영전기",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0125",name:"신진화학",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0126",name:"실버렉스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0127",name:"쌍룡테크",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0128",name:"씨에이치글로벌 주식회사",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0129",name:"씨엔테크전자주식회사",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0130",name:"아이엔티텍",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0131",name:"아이티원",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0132",name:"에스디앤텍",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0133",name:"에스디테크",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0134",name:"에스엠제이티",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0135",name:"에스엠트로닉스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0136",name:"에스트래픽 (주)",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0137",name:"에코헬스케어",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0138",name:"엘아이텍",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0139",name:"엠케이비지에스홀딩스 주식회사",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0140",name:"영광금형",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0141",name:"영인바이오텍",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0142",name:"영일금속",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0143",name:"예성",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0144",name:"오른손테크",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0145",name:"오비스코리아",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0146",name:"올넷전자",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0147",name:"올비트앤",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0148",name:"옵토위즈",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0149",name:"우남산업",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0150",name:"우리종합산업",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0151",name:"우림산업",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0152",name:"원진물산 주식회사",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0153",name:"웰메이드",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0154",name:"웰킵스일렉트리온주식회사",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0155",name:"웰텍",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0156",name:"위드인",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0157",name:"위드헬스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0158",name:"위티",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0159",name:"유일기기",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0160",name:"유한회사 티지앤컴퍼니",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0161",name:"은성라바텍",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0162",name:"이노서스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0163",name:"이노웍스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0164",name:"이랑",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0165",name:"이레테크",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0166",name:"이리스타",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0167",name:"이오니아",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0168",name:"이지인더스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0169",name:"인바디",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0170",name:"인성메디텍",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0171",name:"인성테크놀리지",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0172",name:"장후아이엔지",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0173",name:"정동원",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0174",name:"정린산업",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0175",name:"정수미크론",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0176",name:"정은전자",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0177",name:"정풍전자",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0178",name:"제이앤피",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0179",name:"제이원",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0180",name:"제이월드텍",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0181",name:"주식회사 고웰",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0182",name:"주식회사 근화",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0183",name:"주식회사 뉴퐁",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0184",name:"주식회사 다모텍",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0185",name:"주식회사 메디칼파크",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0186",name:"주식회사 부경컴퍼니",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0187",name:"주식회사 상춘당",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0188",name:"주식회사 스윙",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0189",name:"주식회사 스킨그랩",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0190",name:"주식회사 아이유케어(IU CARE Co., Ltd)",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0191",name:"주식회사 엄브렐라",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0192",name:"주식회사 에스엠",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0193",name:"주식회사 에이치에스케이",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0194",name:"주식회사 에이텍코리아",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0195",name:"주식회사 원웨이랩",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0196",name:"주식회사 유원에스씨",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0197",name:"주식회사 이노스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0198",name:"주식회사 이레이저",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0199",name:"주식회사 케이엠엑스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0200",name:"주식회사 투에이치",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0201",name:"주식회사 티제이씨(TJC)",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0202",name:"주식회사 현성에프앤비",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0203",name:"주식회사나성금속",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0204",name:"주식회사진성실리콘",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0205",name:"지비텍",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0206",name:"지에스전기",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0207",name:"지정테크",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0208",name:"지큐산업(GQ)",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0209",name:"진성기업",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0210",name:"진용정밀",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0211",name:"진테크",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0212",name:"창성 (주)",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0213",name:"청우메디칼",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0214",name:"카멜테크(주)",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0215",name:"케이디엔에이",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0216",name:"케이씨테크",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0217",name:"케이에스산업",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0218",name:"케이엔비코퍼레이션",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0219",name:"케이엔엘 메카",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0220",name:"코닉스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0221",name:"탐탐케어 주식회사",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0222",name:"태광HR",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0223",name:"태광커머스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0224",name:"태승실크",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0225",name:"태형전기",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0226",name:"테스피 주식회사",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0227",name:"테콘",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0228",name:"트루파인더",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0229",name:"티아이티이엔지 성남",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0230",name:"티아이티이엔지 연구소",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0231",name:"펫투데이",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0232",name:"포브커뮤니케이션",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0233",name:"포커스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0234",name:"푸른기술",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0235",name:"풍경춫",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0236",name:"프라임워터",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0237",name:"프레디아코퍼레이션",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0238",name:"프로테크",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0239",name:"프로텍메디칼",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0240",name:"프로텍엘앤에이치",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0241",name:"프린텍 주식회사",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0242",name:"플리머테크",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0243",name:"피오디",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0244",name:"피코 벨브",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0245",name:"픽스턴",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0246",name:"하나화학",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0247",name:"하우스일렉",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0248",name:"하이런",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0249",name:"하이벨",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0250",name:"하이첸",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0251",name:"한미홈케어",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0252",name:"한서정밀계기（주）",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0253",name:"한성솔루텍",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0254",name:"한양종합상사",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0255",name:"한호기술",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0256",name:"해마루(주)",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0257",name:"헤어119",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0258",name:"헥사워터",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0259",name:"헬스앤바이오 주식회사",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0260",name:"현성오토텍",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0261",name:"현우테크",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0262",name:"혜성산업",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0263",name:"홈밀맷돌 주식회사",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0264",name:"화우나노텍(주)",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0265",name:"화창엔지니어링",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0266",name:"효성티앤에스<주>",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0267",name:"휴비디",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0268",name:"휴앤스",contact:"",phone:"",addr:"",memo:""},
+      {id:"v0269",name:"힘펠",contact:"",phone:"",addr:"",memo:""}
+    ],
+    items:[],
+    deliveries:[{id:"d_sample_001",vendor:"비스토스",item:"다이어후렘",qty:"10000",due:"2026-06-10",stockQty:"4000",worker:"A",targetQty:"6000",producedQty:"1000",prodStatus:"작업중",memo:"예시 데이터: 납품 10,000개 / 재고 4,000개 / 목표생산 6,000개",done:false}]
+  };
+}
+
+// ===== 사이드바 =====
+function isDesktop(){ return window.matchMedia("(min-width:980px)").matches; }
+function toggleSidebar(){
+  const sb=document.getElementById("sidebar");
+  if(isDesktop()){
+    document.body.classList.toggle("sidebar-open");
+  }else{
+    const open=sb.classList.toggle("open");
+    document.getElementById("scrim").classList.toggle("show",open);
+  }
+}
+function closeSidebar(){
+  document.getElementById("sidebar").classList.remove("open");
+  document.getElementById("scrim").classList.remove("show");
+}
+function navTo(page){
+  currentPage=page;
+  [["schedule","mlSchedule","schedulePage","일정"],["master","mlMaster","masterPage","제품 마스터"],["vendors","mlVendors","vendorsPage","거래처"],["items","mlItems","itemsPage","품목"],["productLoc","mlProductLoc","productLocPage","제품 보관구역"],["moldLoc","mlMoldLoc","moldLocPage","금형 보관구역"]]
+    .forEach(([p,ml,pg,sub])=>{
+      document.getElementById(ml).classList.toggle("active",p===page);
+      document.getElementById(pg).classList.toggle("hidden",p!==page);
+      if(p===page) document.getElementById("topSub").textContent=sub;
+    });
+  if(!isDesktop()) closeSidebar();
+  render();
+}
+
+// ===== 권한 =====
+function toggleLock(){
+  if(unlocked){unlocked=false;renderLock();render();return;}
+  const input=prompt("관리자키를 입력하세요");
+  if(input===null)return;
+  if(input===ADMIN_KEY){unlocked=true;renderLock();render();}
+  else alert("관리자키가 올바르지 않습니다.");
+}
+function renderLock(){
+  const btn=document.getElementById("lockBtn"),banner=document.getElementById("modeBanner");
+  if(unlocked){
+    btn.classList.add("unlocked");
+    document.getElementById("lockIcon").textContent="🔓";
+    document.getElementById("lockLabel").textContent="잠그기";
+    banner.classList.add("unlocked");
+    document.getElementById("modeText").textContent="관리자 모드입니다. 일정·거래처·품목을 추가·수정·삭제할 수 있습니다.";
+  }else{
+    btn.classList.remove("unlocked");
+    document.getElementById("lockIcon").textContent="🔒";
+    document.getElementById("lockLabel").textContent="관리자키";
+    banner.classList.remove("unlocked");
+    document.getElementById("modeText").textContent="열람 모드입니다. 보기만 가능하며, 수정하려면 관리자키를 입력하세요.";
+  }
+  ["addDelivBtn","addItemBtn","addVendorBtn"].forEach(id=>document.getElementById(id).disabled=!unlocked);
+}
+
+// ===== 캘린더 =====
+function changeMonth(d){viewMonth+=d;if(viewMonth<0){viewMonth=11;viewYear--;}if(viewMonth>11){viewMonth=0;viewYear++;}render();}
+function goToday(){const n=new Date();viewYear=n.getFullYear();viewMonth=n.getMonth();selectedDate=null;render();}
+function selectDay(s){selectedDate=(selectedDate===s)?null:s;render();}
+function renderCalendar(){
+  document.getElementById("calTitle").textContent=`${viewYear}년 ${viewMonth+1}월`;
+  const todayStr=iso(new Date());
+  const first=new Date(viewYear,viewMonth,1),pad=first.getDay();
+  const dim=new Date(viewYear,viewMonth+1,0).getDate();
+  const byDate={};
+  store.deliveries.forEach(it=>{(byDate[it.due]=byDate[it.due]||[]).push(it);});
+  let html="";
+  for(let i=0;i<pad;i++)html+=`<div class="day empty"></div>`;
+  for(let n=1;n<=dim;n++){
+    const ds=`${viewYear}-${String(viewMonth+1).padStart(2,"0")}-${String(n).padStart(2,"0")}`;
+    const dow=new Date(viewYear,viewMonth,n).getDay();
+    const cls=["day"];if(dow===0)cls.push("sun");if(dow===6)cls.push("sat");
+    if(ds===todayStr)cls.push("today");if(ds===selectedDate)cls.push("selected");
+    const list=byDate[ds]||[];let badges="";
+    if(list.length){
+      list.slice(0,2).forEach(it=>{badges+=`<div class="badge ${it.done?'all-done':''}">${it.done?'✓ ':''}${esc(it.vendor)}</div>`;});
+      if(list.length>2)badges+=`<div class="badge-more">+${list.length-2}건</div>`;
+    }
+    html+=`<div class="${cls.join(' ')}" onclick="selectDay('${ds}')"><span class="day-num">${n}</span>${badges}</div>`;
+  }
+  document.getElementById("days").innerHTML=html;
+}
+
+// ===== 납기 목록 =====
+function renderDeliv(){
+  const now=new Date(),mon=mondayOf(now),sun=new Date(mon);sun.setDate(mon.getDate()+6);
+  const monStr=iso(mon),sunStr=iso(sun);
+  document.getElementById("rangePill").textContent="이번 주 "+fmtRange(mon);
+  let view=selectedDate?store.deliveries.filter(it=>it.due===selectedDate):store.deliveries.filter(it=>it.due>=monStr&&it.due<=sunStr);
+  view.sort((a,b)=>a.due<b.due?-1:a.due>b.due?1:(a.done-b.done));
+  const wrap=document.getElementById("delivList");
+  if(!view.length){wrap.innerHTML=`<div class="empty-msg">${selectedDate?'선택한 날짜에 납기 건이 없습니다.':'이번 주 납기 건이 없습니다.'}</div>`;return;}
+  const todayStr=iso(now);
+  wrap.innerHTML=view.map(it=>{
+    const [,m,d]=it.due.split("-");const dueLabel=`${parseInt(m)}/${parseInt(d)}`;
+    const soon=(!it.done&&it.due===todayStr);
+    const loc=findItemLoc(it.item);
+    const actions=unlocked?`<div class="item-actions"><button class="icon-btn" onclick="editDeliv('${it.id}')" title="수정">✎</button><button class="icon-btn" onclick="deleteDeliv('${it.id}')" title="삭제">🗑</button></div>`:"";
+    const qtyN=num(it.qty), stockN=num(it.stockQty), targetN=it.targetQty!==undefined&&it.targetQty!==""?num(it.targetQty):Math.max(qtyN-stockN,0);
+    const producedN=num(it.producedQty);
+    const shortageN=Math.max(targetN-producedN,0);
+    const pct=targetN?Math.min(100,Math.round(producedN/targetN*100)):0;
+    const status=it.prodStatus||it.workStatus||"대기";
+    const detail=`<div class="prod-progress"><div>재고 ${fmtNum(stockN)}개 · 작업자 ${esc(it.worker||'-')} · <strong>${esc(status)}</strong> · 생산 ${fmtNum(producedN)} / ${fmtNum(targetN)}개 · <span class="short">부족 ${fmtNum(shortageN)}개</span></div><div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div></div>`;
+    return `<div class="item ${it.done?'done':''}"><div class="check ${it.done?'checked':''} ${unlocked?'':'locked'}" onclick="event.stopPropagation();toggleDone('${it.id}')">${it.done?'✓':''}</div><div class="item-body" onclick="editDeliv('${it.id}')"><div class="item-top"><span class="vendor">${esc(it.vendor)}</span><span class="due-tag ${soon?'soon':''}">${dueLabel}${soon?' · 오늘':''}</span></div><div class="item-meta">${esc(it.item)} · 납품 ${fmtNum(qtyN)}개</div>${detail}${loc?`<div class="item-loc">📍 ${esc(loc)}</div>`:""}${it.memo?`<div class="item-memo">${esc(it.memo)}</div>`:""}</div>${actions}</div>`;
+  }).join("");
+}
+function findItemLoc(itemName){
+  const it=store.items.find(x=>x.name===itemName);
+  if(!it||!it.zone)return "";
+  let s="재고대 "+it.zone;if(it.col)s+=" "+it.col+"열";if(it.cell)s+=" "+it.cell+"번칸";
+  return s;
+}
+function vendorName(id){const v=store.vendors.find(x=>x.id===id);return v?v.name:"";}
+function locText(it){if(!it.zone)return "위치 미지정";let s="재고대 "+it.zone;if(it.col)s+=" · "+it.col+"열";if(it.cell)s+=" · "+it.cell+"번칸";return s;}
+
+// ===== 품목 (거래처별 드롭다운: 가나다순 + 검색 + 스크롤) =====
+function toggleVendorPicker(e){
+  if(e) e.stopPropagation();
+  const p=document.getElementById("vendorPicker");
+  const opening=!p.classList.contains("open");
+  p.classList.toggle("open",opening);
+  if(opening){
+    document.getElementById("vpSearch").value="";
+    renderVendorOptions();
+    setTimeout(()=>document.getElementById("vpSearch").focus(),50);
+  }
+}
+function closeVendorPicker(){ document.getElementById("vendorPicker").classList.remove("open"); }
+
+// 현재 선택된 거래처 이름을 토글 버튼에 반영 (전체일 땐 '거래처 검색')
+function renderVendorPickerLabel(){
+  let name="거래처 검색", isPlaceholder=true;
+  if(vendorFilter==='__none__'){ name="거래처 미지정"; isPlaceholder=false; }
+  else if(vendorFilter){ name=vendorName(vendorFilter); isPlaceholder=false; }
+  const el=document.getElementById("vpCurName");
+  el.textContent=name;
+  el.classList.toggle("placeholder",isPlaceholder);
+}
+// 드롭다운 안의 거래처 목록 (가나다순 정렬 + 검색어 필터)
+function renderVendorOptions(){
+  const q=document.getElementById("vpSearch").value.trim().toLowerCase();
+  const list=document.getElementById("vpList");
+  // 가나다순 정렬 (한국어 로케일)
+  const sorted=store.vendors.slice().sort((a,b)=>a.name.localeCompare(b.name,"ko"));
+  const noVendorCnt=store.items.filter(it=>!it.vendorId).length;
+
+  // 상단 고정 항목 (검색어 없을 때만)
+  let fixed="";
+  if(!q){
+    fixed=`<div class="vp-fixed">
+      <div class="vp-opt ${vendorFilter===''?'active':''}" onclick="setVendorFilter('')">
+        <span class="vp-opt-name">전체 품목</span><span class="vp-opt-cnt">${store.items.length}개</span></div>`;
+    if(noVendorCnt>0){
+      fixed+=`<div class="vp-opt ${vendorFilter==='__none__'?'active':''}" onclick="setVendorFilter('__none__')">
+        <span class="vp-opt-name">거래처 미지정</span><span class="vp-opt-cnt">${noVendorCnt}개</span></div>`;
+    }
+    fixed+=`</div>`;
+  }
+
+  const filtered=sorted.filter(v=>!q||v.name.toLowerCase().includes(q)||(v.contact||"").toLowerCase().includes(q));
+  let opts=filtered.map(v=>{
+    const cnt=store.items.filter(it=>it.vendorId===v.id).length;
+    return `<div class="vp-opt ${vendorFilter===v.id?'active':''}" onclick="setVendorFilter('${v.id}')">
+      <span class="vp-opt-name">${esc(v.name)}</span><span class="vp-opt-cnt">${cnt}개</span></div>`;
+  }).join("");
+
+  if(!filtered.length && q){ opts=`<div class="vp-empty">‘${esc(q)}’에 맞는 거래처가 없습니다.</div>`; }
+  list.innerHTML=fixed+opts;
+}
+function setVendorFilter(id){
+  vendorFilter=id;
+  closeVendorPicker();
+  renderItems();
+}
+function renderItems(){
+  renderVendorPickerLabel();
+  const q=document.getElementById("itemSearch").value.trim().toLowerCase();
+  const zone=document.getElementById("zoneFilter").value;
+  let list=store.items.filter(it=>{
+    if(vendorFilter==='__none__'){ if(it.vendorId)return false; }
+    else if(vendorFilter){ if(it.vendorId!==vendorFilter)return false; }
+    if(zone&&it.zone!==zone)return false;
+    if(q){const hay=(it.name+" "+it.code+" "+it.color+" "+vendorName(it.vendorId)).toLowerCase();if(!hay.includes(q))return false;}
+    return true;
+  });
+  const total=store.items.length;
+  const filtered=(vendorFilter||zone||q);
+  document.getElementById("itemCount").textContent = filtered
+    ? `${list.length}개 표시 · 전체 ${total}개`
+    : `전체 ${total}개`;
+  const grid=document.getElementById("itemGrid");
+  if(!list.length){grid.className="";grid.innerHTML=`<div class="empty-box">표시할 품목이 없습니다.${unlocked?' 우측 “품목 추가”로 등록하세요.':''}</div>`;return;}
+  grid.className="grid";
+  grid.innerHTML=list.map(it=>{
+    const photo=it.photos&&it.photos.length?it.photos[0]:null;
+    const thumb=photo?`<img src="${photo}" alt=""><span class="photo-count">${it.photos.length}장</span>`:`<div class="thumb-empty"><span>🖼</span>사진 없음</div>`;
+    const actions=unlocked?`<div class="prod-actions"><button class="mini-btn" onclick="editItem('${it.id}')">수정</button><button class="mini-btn" onclick="deleteItem('${it.id}')">삭제</button></div>`:"";
+    return `<div class="prod-card"><div class="thumb">${thumb}</div><div class="prod-body"><div><div class="prod-name">${esc(it.name)}</div><div class="prod-code">${esc(it.code)} · ${esc(vendorName(it.vendorId)||"거래처 미지정")}</div></div><div class="spec-row">${it.spec?`<span class="chip">${esc(it.spec)}</span>`:""}${it.color?`<span class="chip color">${esc(it.color)}</span>`:""}</div>${it.price?`<div class="price-line">${esc(it.price)}원 / ${esc(it.unit||"개")}</div>`:""}<div class="loc-line">📍 ${esc(locText(it))}</div></div>${actions}</div>`;
+  }).join("");
+}
+
+// ===== 제품 마스터 =====
+function fillMasterVendorFilter(){
+  const sel=document.getElementById("masterVendorFilter");
+  const cur=sel.value;
+  const sorted=store.vendors.slice().sort((a,b)=>a.name.localeCompare(b.name,"ko"));
+  sel.innerHTML='<option value="">전체 거래처</option>'+sorted.map(v=>`<option value="${v.id}" ${v.id===cur?"selected":""}>${esc(v.name)}</option>`).join("");
+}
+function renderMaster(){
+  fillMasterVendorFilter();
+  const q=document.getElementById("masterSearch").value.trim().toLowerCase();
+  const vf=document.getElementById("masterVendorFilter").value;
+  let list=store.items.filter(it=>{
+    if(vf && it.vendorId!==vf) return false;
+    if(q){const hay=(it.name+" "+(it.code||"")+" "+vendorName(it.vendorId)).toLowerCase();if(!hay.includes(q))return false;}
+    return true;
+  });
+  list.sort((a,b)=>a.name.localeCompare(b.name,"ko"));
+  const total=store.items.length;
+  document.getElementById("masterCount").textContent=(q||vf)?`${list.length}개 표시 · 전체 ${total}개`:`전체 ${total}개`;
+  const box=document.getElementById("masterList");
+  if(!total){
+    box.innerHTML=`<div class="master-empty">아직 등록된 제품이 없습니다.${unlocked?' “품목” 메뉴에서 제품을 등록하세요.':''}</div>`;
+    return;
+  }
+  if(!list.length){
+    box.innerHTML=`<div class="master-empty">‘${esc(q)}’에 맞는 제품이 없습니다.</div>`;
+    return;
+  }
+  box.className="master-list";
+  box.innerHTML=list.map(it=>{
+    const photo=(it.photos&&it.photos.length)?it.photos[0]:null;
+    const thumb=photo?`<img class="master-row-thumb" src="${photo}" alt="">`:`<div class="master-row-thumb empty">🖼</div>`;
+    const vn=vendorName(it.vendorId)||"거래처 미지정";
+    const sub=[it.code, it.spec].filter(Boolean).join(" · ");
+    return `<div class="master-row" onclick="openMasterDetail('${it.id}')">
+      ${thumb}
+      <div class="master-row-main">
+        <div class="master-row-name">${esc(it.name)}</div>
+        <div class="master-row-sub"><span class="master-row-vendor">${esc(vn)}</span>${sub?" · "+esc(sub):""}</div>
+      </div>
+      <span class="master-row-arrow">›</span>
+    </div>`;
+  }).join("");
+}
+
+function mdCell(label, value, opts){
+  opts=opts||{};
+  const cls=opts.full?"md-cell full":"md-cell";
+  const vcls="md-cell-value"+(opts.big?" big":"")+(value?"":" muted");
+  return `<div class="${cls}"><div class="md-cell-label">${esc(label)}</div><div class="${vcls}">${value?esc(value):"미입력"}</div></div>`;
+}
+function openMasterDetail(id){
+  const it=store.items.find(x=>x.id===id);
+  if(!it)return;
+  const vn=vendorName(it.vendorId)||"거래처 미지정";
+  const photo=(it.photos&&it.photos.length)?it.photos[0]:null;
+  const headPhoto=photo
+    ? `<img class="md-photo" src="${photo}" alt="" onclick="openPhotoGallery('${id}','product')">`
+    : `<div class="md-photo empty">🖼</div>`;
+
+  // 제품 보관위치
+  const prodLoc = it.zone ? formatLoc({zone:it.zone,col:it.col,cell:it.cell},"product") : "";
+  // 금형 위치
+  const mp=parseMoldZone(it.mzone);
+  const moldLoc = mp ? formatLoc({zone:it.mzone,col:"",cell:it.mcell},"mold") : "";
+
+  // 제조 정보 칸들
+  const mfgCells=[
+    mdCell("금형대 위치", moldLoc, {big:true}),
+    mdCell("원재료", it.material),
+    mdCell("색상 / 배합", it.mfgcolor),
+    mdCell("배치 방법", it.batch),
+    mdCell("가공 온도", it.temp),
+    mdCell("가공 시간", it.time),
+  ].join("");
+
+  // 불량/참고 사진
+  const defectPhotos=(it.defectPhotos&&it.defectPhotos.length)
+    ? `<div class="md-photos">${it.defectPhotos.map((p,i)=>`<img src="${p}" alt="" onclick="openPhotoGallery('${id}','defect',${i})">`).join("")}</div>`
+    : "";
+  // 금형 사진
+  const moldPhotos=(it.moldPhotos&&it.moldPhotos.length)
+    ? `<div class="md-photos">${it.moldPhotos.map((p,i)=>`<img src="${p}" alt="" onclick="openPhotoGallery('${id}','mold',${i})">`).join("")}</div>`
+    : "";
+
+  const editBtn=unlocked?`<div style="margin-top:6px"><button class="md-edit-btn" onclick="closeMasterDetail();editItem('${id}')">✏️ 이 제품 정보 수정</button></div>`:"";
+
+  document.getElementById("masterDetailBody").innerHTML=`
+    <div class="md-header">
+      ${headPhoto}
+      <div class="md-head-text">
+        <div class="md-name">${esc(it.name)}</div>
+        ${it.code?`<div class="md-code">${esc(it.code)}</div>`:""}
+        <div class="md-vendor">🏢 ${esc(vn)}</div>
+      </div>
+    </div>
+
+    <div class="md-section">
+      <div class="md-section-title">📦 재고 / 보관</div>
+      <div class="md-grid">
+        ${mdCell("재고 수량", "", {})}
+        ${mdCell("제품 보관위치", prodLoc, {big:true})}
+      </div>
+      <div style="font-size:11.5px;color:var(--ink-soft);margin-top:6px">※ 재고 수량은 추후 입출고 기록 기능으로 자동 계산될 예정입니다.</div>
+    </div>
+
+    <div class="md-section">
+      <div class="md-section-title">⚙️ 제조 방법</div>
+      <div class="md-grid">${mfgCells}</div>
+      ${moldPhotos?`<div class="md-cell-label" style="margin-top:10px">금형 사진</div>${moldPhotos}`:""}
+    </div>
+
+    <div class="md-section">
+      <div class="md-section-title">📝 작업 메모 / 노하우</div>
+      <div class="md-note ${it.worknote?"":"empty"}">${it.worknote?esc(it.worknote):"작업 메모가 아직 없습니다. 불량 원인, 예방 팁, 사용처 등을 기록해두면 다음 작업에 도움이 됩니다."}</div>
+      ${defectPhotos?`<div class="md-cell-label" style="margin-top:10px">불량품 / 참고 사진</div>${defectPhotos}`:""}
+    </div>
+
+    ${(it.spec||it.color||it.price||it.memo)?`<div class="md-section">
+      <div class="md-section-title">ℹ️ 기타 정보</div>
+      <div class="md-grid">
+        ${it.spec?mdCell("규격 / 사양", it.spec):""}
+        ${it.color?mdCell("색상", it.color):""}
+        ${it.price?mdCell("단가", it.price+"원 / "+(it.unit||"개")):""}
+        ${it.memo?mdCell("비고", it.memo, {full:true}):""}
+      </div>
+    </div>`:""}
+
+    ${editBtn}
+  `;
+  document.getElementById("masterDetailOverlay").classList.add("show");
+}
+function closeMasterDetail(){document.getElementById("masterDetailOverlay").classList.remove("show");}
+// 사진 갤러리: 큰 이미지 보기 (제품/금형/불량 공용)
+function openPhotoGallery(id,kind,startIdx){
+  const it=store.items.find(x=>x.id===id);
+  if(!it)return;
+  let arr=[];
+  if(kind==="product")arr=it.photos||[];
+  else if(kind==="mold")arr=it.moldPhotos||[];
+  else if(kind==="defect")arr=it.defectPhotos||[];
+  if(!arr.length)return;
+  openPhotoViewer(arr, startIdx||0);
+}
+let pvArr=[], pvIdx=0;
+function openPhotoViewer(arr, idx){
+  pvArr=arr; pvIdx=idx||0;
+  pvShow();
+  document.getElementById("photoViewerOverlay").classList.add("show");
+}
+function pvShow(){
+  if(!pvArr.length)return;
+  document.getElementById("pvImg").src=pvArr[pvIdx];
+  document.getElementById("pvCount").textContent=pvArr.length>1?`${pvIdx+1} / ${pvArr.length}`:"";
+  const multi=pvArr.length>1;
+  document.querySelector(".pv-prev").style.display=multi?"":"none";
+  document.querySelector(".pv-next").style.display=multi?"":"none";
+}
+function pvMove(d){ pvIdx=(pvIdx+d+pvArr.length)%pvArr.length; pvShow(); }
+function closePhotoViewer(){document.getElementById("photoViewerOverlay").classList.remove("show");}
+
+// ===== 거래처 =====
+function renderVendors(){
+  const q=document.getElementById("vendorSearch").value.trim().toLowerCase();
+  let list=store.vendors.filter(v=>!q||(v.name+" "+v.contact).toLowerCase().includes(q));
+  document.getElementById("vendorCount").textContent=`전체 ${store.vendors.length}개 거래처 중 ${list.length}개 표시`;
+  const wrap=document.getElementById("vendorList");
+  if(!list.length){wrap.innerHTML=`<div class="empty-box">표시할 거래처가 없습니다.${unlocked?' 우측 상단 “거래처 추가”로 등록하세요.':''}</div>`;return;}
+  wrap.className="vendor-list";
+  wrap.innerHTML=list.map(v=>{
+    const cnt=store.items.filter(it=>it.vendorId===v.id).length;
+    const actions=unlocked?`<div class="item-actions"><button class="icon-btn" onclick="editVendor('${v.id}')" title="수정">✎</button><button class="icon-btn" onclick="deleteVendor('${v.id}')" title="삭제">🗑</button></div>`:"";
+    return `<div class="vendor-card"><div class="vendor-avatar">${esc(v.name.charAt(0))}</div><div class="vendor-info"><div class="vendor-name">${esc(v.name)}</div><div class="vendor-meta">${v.contact?`<span>👤 ${esc(v.contact)}</span>`:""}${v.phone?`<span>📞 ${esc(v.phone)}</span>`:""}<span>📦 품목 ${cnt}개</span></div>${v.addr?`<div class="vendor-meta"><span>📍 ${esc(v.addr)}</span></div>`:""}${v.memo?`<div class="vendor-memo">${esc(v.memo)}</div>`:""}</div>${actions}</div>`;
+  }).join("");
+}
+
+// ===== 납기 모달 =====
+function fillDelivSelects(sv,si){
+  document.getElementById("d_vendor").innerHTML='<option value="">직접 입력 또는 선택</option>'+store.vendors.map(v=>`<option ${v.name===sv?"selected":""}>${esc(v.name)}</option>`).join("");
+  document.getElementById("d_item").innerHTML='<option value="">직접 입력 또는 선택</option>'+store.items.map(it=>`<option ${it.name===si?"selected":""}>${esc(it.name)}</option>`).join("");
+}
+function openDelivModal(){
+  if(!unlocked)return;editingDelivId=null;
+  document.getElementById("delivModalTitle").textContent="납기 / 생산일보 항목 추가";
+  ["d_vendorText","d_itemText","d_qty","d_stock","d_worker","d_target","d_produced","d_memo","d_shortage"].forEach(id=>document.getElementById(id).value="");
+  document.getElementById("d_prodStatus").value="대기";
+  document.getElementById("d_due").value=selectedDate||iso(new Date());
+  fillDelivSelects("");document.getElementById("delivOverlay").classList.add("show");
+  calcShortage();
+}
+function editDeliv(id){
+  const it=store.deliveries.find(x=>x.id===id);if(!it)return;
+  if(!unlocked){alert("상세정보를 수정하려면 관리자키를 입력하세요.");return;}
+  editingDelivId=id;
+  document.getElementById("delivModalTitle").textContent="납기 / 생산일보 상세 수정";
+  fillDelivSelects(it.vendor,it.item);
+  document.getElementById("d_vendorText").value=store.vendors.some(v=>v.name===it.vendor)?"":it.vendor;
+  document.getElementById("d_itemText").value=store.items.some(x=>x.name===it.item)?"":it.item;
+  document.getElementById("d_qty").value=it.qty||"";
+  document.getElementById("d_stock").value=it.stockQty||"";
+  document.getElementById("d_worker").value=it.worker||"";
+  const autoTarget=Math.max(num(it.qty)-num(it.stockQty),0);
+  document.getElementById("d_target").value=(it.targetQty!==undefined&&it.targetQty!=="")?it.targetQty:autoTarget;
+  document.getElementById("d_produced").value=it.producedQty||"";
+  document.getElementById("d_prodStatus").value=it.prodStatus||"대기";
+  document.getElementById("d_due").value=it.due;
+  document.getElementById("d_memo").value=it.memo||"";
+  calcShortage();
+  document.getElementById("delivOverlay").classList.add("show");
+}
+function closeDelivModal(){document.getElementById("delivOverlay").classList.remove("show");}
+function saveDeliv(){
+  const vendor=document.getElementById("d_vendorText").value.trim()||document.getElementById("d_vendor").value;
+  const item=document.getElementById("d_itemText").value.trim()||document.getElementById("d_item").value;
+  const due=document.getElementById("d_due").value;
+  const qty=document.getElementById("d_qty").value.trim();
+  const stockQty=document.getElementById("d_stock").value.trim();
+  const worker=document.getElementById("d_worker").value.trim();
+  const targetQty=document.getElementById("d_target").value.trim();
+  const producedQty=document.getElementById("d_produced").value.trim();
+  const prodStatus=document.getElementById("d_prodStatus").value;
+  const memo=document.getElementById("d_memo").value.trim();
+  if(!vendor||!item||!due){alert("거래처, 제품명, 납기일은 필수입니다.");return;}
+  const done = prodStatus==="완료" || (targetQty!=="" && num(producedQty)>=num(targetQty));
+  const payload={vendor,item,qty,due,stockQty,worker,targetQty,producedQty,prodStatus,memo,done};
+  if(editingDelivId){Object.assign(store.deliveries.find(x=>x.id===editingDelivId),payload);}
+  else{store.deliveries.push({id:uid(),...payload});}
+  save();closeDelivModal();render();
+}
+function toggleDone(id){if(!unlocked){alert("수정하려면 관리자키를 입력하세요.");return;}const it=store.deliveries.find(x=>x.id===id);if(it){it.done=!it.done;it.prodStatus=it.done?"완료":(it.prodStatus||"작업중");save();render();}}
+function deleteDeliv(id){if(!unlocked)return;if(!confirm("이 항목을 삭제할까요?"))return;store.deliveries=store.deliveries.filter(x=>x.id!==id);save();render();}
+
+// ===== 품목 모달 =====
+function fillVendorSelect(sel){document.getElementById("i_vendor").innerHTML='<option value="">선택 안 함</option>'+store.vendors.map(v=>`<option value="${v.id}" ${v.id===sel?"selected":""}>${esc(v.name)}</option>`).join("");}
+function renderPhotoStrip(){document.getElementById("photoStrip").innerHTML=tempPhotos.map((p,i)=>`<div class="photo-wrap"><img class="photo-thumb" src="${p}" alt=""><button class="del" onclick="removePhoto(${i})">×</button></div>`).join("")+`<div class="add-photo" onclick="document.getElementById('photoInput').click()">＋</div>`;}
+function addPhotos(e){const files=Array.from(e.target.files||[]);let rem=files.length;if(!rem)return;files.forEach(file=>{const r=new FileReader();r.onload=()=>{const img=new Image();img.onload=()=>{const c=document.createElement("canvas");const mx=600,sc=Math.min(1,mx/img.width);c.width=img.width*sc;c.height=img.height*sc;c.getContext("2d").drawImage(img,0,0,c.width,c.height);tempPhotos.push(c.toDataURL("image/jpeg",0.7));rem--;renderPhotoStrip();};img.src=r.result;};r.readAsDataURL(file);});e.target.value="";}
+function removePhoto(i){tempPhotos.splice(i,1);renderPhotoStrip();}
+function renderMoldPhotoStrip(){document.getElementById("moldPhotoStrip").innerHTML=tempMoldPhotos.map((p,i)=>`<div class="photo-wrap"><img class="photo-thumb" src="${p}" alt=""><button class="del" onclick="removeMoldPhoto(${i})">×</button></div>`).join("")+`<div class="add-photo" onclick="document.getElementById('moldPhotoInput').click()">＋</div>`;}
+function addMoldPhotos(e){const files=Array.from(e.target.files||[]);let rem=files.length;if(!rem)return;files.forEach(file=>{const r=new FileReader();r.onload=()=>{const img=new Image();img.onload=()=>{const c=document.createElement("canvas");const mx=600,sc=Math.min(1,mx/img.width);c.width=img.width*sc;c.height=img.height*sc;c.getContext("2d").drawImage(img,0,0,c.width,c.height);tempMoldPhotos.push(c.toDataURL("image/jpeg",0.7));rem--;renderMoldPhotoStrip();};img.src=r.result;};r.readAsDataURL(file);});e.target.value="";}
+function removeMoldPhoto(i){tempMoldPhotos.splice(i,1);renderMoldPhotoStrip();}
+function renderDefectPhotoStrip(){document.getElementById("defectPhotoStrip").innerHTML=tempDefectPhotos.map((p,i)=>`<div class="photo-wrap"><img class="photo-thumb" src="${p}" alt=""><button class="del" onclick="removeDefectPhoto(${i})">×</button></div>`).join("")+`<div class="add-photo" onclick="document.getElementById('defectPhotoInput').click()">＋</div>`;}
+function addDefectPhotos(e){const files=Array.from(e.target.files||[]);let rem=files.length;if(!rem)return;files.forEach(file=>{const r=new FileReader();r.onload=()=>{const img=new Image();img.onload=()=>{const c=document.createElement("canvas");const mx=600,sc=Math.min(1,mx/img.width);c.width=img.width*sc;c.height=img.height*sc;c.getContext("2d").drawImage(img,0,0,c.width,c.height);tempDefectPhotos.push(c.toDataURL("image/jpeg",0.7));rem--;renderDefectPhotoStrip();};img.src=r.result;};r.readAsDataURL(file);});e.target.value="";}
+function removeDefectPhoto(i){tempDefectPhotos.splice(i,1);renderDefectPhotoStrip();}
+function openItemModal(){
+  if(!unlocked)return;editingItemId=null;tempPhotos=[];tempMoldPhotos=[];tempDefectPhotos=[];
+  document.getElementById("itemModalTitle").textContent="품목 추가";
+  ["i_code","i_name","i_spec","i_color","i_price","i_unit","i_col","i_cell","i_mcell","i_memo","i_material","i_mfgcolor","i_batch","i_temp","i_time","i_worknote"].forEach(id=>document.getElementById(id).value="");
+  document.getElementById("i_zone").value="";
+  document.getElementById("i_mzone").value="";
+  document.getElementById("i_mfloor").value="";
+  // 현재 거래처별 필터가 걸려있으면 그 거래처를 기본 선택
+  fillVendorSelect(vendorFilter&&vendorFilter!=='__none__'?vendorFilter:"");
+  renderPhotoStrip();renderMoldPhotoStrip();renderDefectPhotoStrip();document.getElementById("itemOverlay").classList.add("show");
+}
+function editItem(id){
+  if(!unlocked)return;const it=store.items.find(x=>x.id===id);if(!it)return;editingItemId=id;tempPhotos=(it.photos||[]).slice();tempMoldPhotos=(it.moldPhotos||[]).slice();tempDefectPhotos=(it.defectPhotos||[]).slice();
+  document.getElementById("itemModalTitle").textContent="품목 수정";
+  document.getElementById("i_code").value=it.code||"";document.getElementById("i_name").value=it.name||"";
+  document.getElementById("i_spec").value=it.spec||"";document.getElementById("i_color").value=it.color||"";
+  document.getElementById("i_price").value=it.price||"";document.getElementById("i_unit").value=it.unit||"";
+  document.getElementById("i_zone").value=it.zone||"";document.getElementById("i_col").value=it.col||"";document.getElementById("i_cell").value=it.cell||"";
+  // 금형 위치: 저장된 mzone("A-3" 또는 기존 "a-1")을 구역/층으로 분해
+  const mp=parseMoldZone(it.mzone);
+  document.getElementById("i_mzone").value=mp?mp.zone:"";
+  document.getElementById("i_mfloor").value=(mp&&mp.floor)?String(mp.floor):"";
+  document.getElementById("i_mcell").value=it.mcell||"";
+  // 제조 정보 + 작업 메모
+  document.getElementById("i_material").value=it.material||"";
+  document.getElementById("i_mfgcolor").value=it.mfgcolor||"";
+  document.getElementById("i_batch").value=it.batch||"";
+  document.getElementById("i_temp").value=it.temp||"";
+  document.getElementById("i_time").value=it.time||"";
+  document.getElementById("i_worknote").value=it.worknote||"";
+  document.getElementById("i_memo").value=it.memo||"";fillVendorSelect(it.vendorId);renderPhotoStrip();renderMoldPhotoStrip();renderDefectPhotoStrip();
+  document.getElementById("itemOverlay").classList.add("show");
+}
+function closeItemModal(){document.getElementById("itemOverlay").classList.remove("show");}
+function saveItem(){
+  const name=document.getElementById("i_name").value.trim();
+  if(!name){alert("품목명은 필수입니다.");return;}
+  const mzoneVal=document.getElementById("i_mzone").value;
+  const mfloorVal=document.getElementById("i_mfloor").value;
+  // 구역+층을 "A-3" 형태로 합침 (구역만 있으면 "A", 둘 다 없으면 "")
+  const mzoneCombined = mzoneVal ? (mfloorVal ? mzoneVal+"-"+mfloorVal : mzoneVal) : "";
+  const obj={code:document.getElementById("i_code").value.trim(),vendorId:document.getElementById("i_vendor").value,name,spec:document.getElementById("i_spec").value.trim(),color:document.getElementById("i_color").value.trim(),price:document.getElementById("i_price").value.trim(),unit:document.getElementById("i_unit").value.trim(),zone:document.getElementById("i_zone").value,col:document.getElementById("i_col").value.trim(),cell:document.getElementById("i_cell").value.trim(),mzone:mzoneCombined,mcol:"",mcell:document.getElementById("i_mcell").value.trim(),material:document.getElementById("i_material").value.trim(),mfgcolor:document.getElementById("i_mfgcolor").value.trim(),batch:document.getElementById("i_batch").value.trim(),temp:document.getElementById("i_temp").value.trim(),time:document.getElementById("i_time").value.trim(),worknote:document.getElementById("i_worknote").value.trim(),memo:document.getElementById("i_memo").value.trim(),photos:tempPhotos.slice(),moldPhotos:tempMoldPhotos.slice(),defectPhotos:tempDefectPhotos.slice()};
+  if(editingItemId){Object.assign(store.items.find(x=>x.id===editingItemId),obj);}
+  else{obj.id=uid();store.items.push(obj);}
+  save();closeItemModal();renderItems();
+}
+function deleteItem(id){if(!unlocked)return;if(!confirm("이 품목을 삭제할까요?"))return;store.items=store.items.filter(x=>x.id!==id);save();renderItems();}
+
+// ===== 거래처 모달 =====
+function openVendorModal(){if(!unlocked)return;editingVendorId=null;document.getElementById("vendorModalTitle").textContent="거래처 추가";["v_name","v_contact","v_phone","v_addr","v_memo"].forEach(id=>document.getElementById(id).value="");document.getElementById("vendorOverlay").classList.add("show");}
+function editVendor(id){if(!unlocked)return;const v=store.vendors.find(x=>x.id===id);if(!v)return;editingVendorId=id;document.getElementById("vendorModalTitle").textContent="거래처 수정";document.getElementById("v_name").value=v.name||"";document.getElementById("v_contact").value=v.contact||"";document.getElementById("v_phone").value=v.phone||"";document.getElementById("v_addr").value=v.addr||"";document.getElementById("v_memo").value=v.memo||"";document.getElementById("vendorOverlay").classList.add("show");}
+function closeVendorModal(){document.getElementById("vendorOverlay").classList.remove("show");}
+function saveVendor(){
+  const name=document.getElementById("v_name").value.trim();
+  if(!name){alert("거래처명은 필수입니다.");return;}
+  const obj={name,contact:document.getElementById("v_contact").value.trim(),phone:document.getElementById("v_phone").value.trim(),addr:document.getElementById("v_addr").value.trim(),memo:document.getElementById("v_memo").value.trim()};
+  if(editingVendorId){Object.assign(store.vendors.find(x=>x.id===editingVendorId),obj);}
+  else{obj.id=uid();store.vendors.push(obj);}
+  save();closeVendorModal();renderVendors();
+}
+function deleteVendor(id){
+  if(!unlocked)return;
+  const cnt=store.items.filter(it=>it.vendorId===id).length;
+  const msg=cnt>0?`이 거래처를 삭제할까요?\n연결된 품목 ${cnt}개는 “거래처 미지정”으로 바뀝니다.`:"이 거래처를 삭제할까요?";
+  if(!confirm(msg))return;
+  store.items.forEach(it=>{if(it.vendorId===id)it.vendorId="";});
+  store.vendors=store.vendors.filter(x=>x.id!==id);
+  if(vendorFilter===id) vendorFilter="";
+  save();renderVendors();
+}
+
+[["delivOverlay",closeDelivModal],["itemOverlay",closeItemModal],["vendorOverlay",closeVendorModal]].forEach(([id,fn])=>{document.getElementById(id).addEventListener("click",e=>{if(e.target.id===id)fn();});});
+
+// 거래처 드롭다운 바깥 클릭 시 닫기
+document.addEventListener("click",e=>{
+  ["vendorPicker","vendorPicker_p","vendorPicker_m"].forEach(id=>{
+    const picker=document.getElementById(id);
+    if(picker && picker.classList.contains("open") && !picker.contains(e.target)){
+      picker.classList.remove("open");
+    }
+  });
+});
+
+// ===== 보관구역 페이지 (제품/금형 공용) =====
+// kind: "product" 또는 "mold", suffix: "p" 또는 "m"
+function locSuffix(kind){ return kind==="product"?"p":"m"; }
+function locKind(suffix){ return suffix==="p"?"product":"mold"; }
+
+function toggleLocVendorPicker(suffix,e){
+  if(e) e.stopPropagation();
+  const p=document.getElementById("vendorPicker_"+suffix);
+  const opening=!p.classList.contains("open");
+  // 다른 드롭다운들은 닫기
+  ["vendorPicker","vendorPicker_p","vendorPicker_m"].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el && id!=="vendorPicker_"+suffix) el.classList.remove("open");
+  });
+  p.classList.toggle("open",opening);
+  if(opening){
+    document.getElementById("vpSearch_"+suffix).value="";
+    renderLocVendorOptions(suffix);
+    setTimeout(()=>document.getElementById("vpSearch_"+suffix).focus(),50);
+  }
+}
+function closeLocVendorPicker(suffix){
+  document.getElementById("vendorPicker_"+suffix).classList.remove("open");
+}
+function renderLocVendorPickerLabel(suffix){
+  const sel=locVendor[suffix];
+  const el=document.getElementById("vpCurName_"+suffix);
+  if(!sel){ el.textContent="거래처 선택"; el.classList.add("placeholder"); }
+  else { el.textContent=vendorName(sel)||"거래처 선택"; el.classList.remove("placeholder"); }
+}
+function renderLocVendorOptions(suffix){
+  const q=document.getElementById("vpSearch_"+suffix).value.trim().toLowerCase();
+  const list=document.getElementById("vpList_"+suffix);
+  const sorted=store.vendors.slice().sort((a,b)=>a.name.localeCompare(b.name,"ko"));
+  const filtered=sorted.filter(v=>!q||v.name.toLowerCase().includes(q)||(v.contact||"").toLowerCase().includes(q));
+  const sel=locVendor[suffix];
+  let opts=filtered.map(v=>{
+    const cnt=store.items.filter(it=>it.vendorId===v.id).length;
+    return `<div class="vp-opt ${sel===v.id?'active':''}" onclick="setLocVendor('${suffix}','${v.id}')">
+      <span class="vp-opt-name">${esc(v.name)}</span><span class="vp-opt-cnt">${cnt}개</span></div>`;
+  }).join("");
+  if(!filtered.length){
+    opts=`<div class="vp-empty">${q?'‘'+esc(q)+'’에 맞는 거래처가 없습니다.':'등록된 거래처가 없습니다.'}</div>`;
+  }
+  list.innerHTML=opts;
+}
+function setLocVendor(suffix,id){
+  locVendor[suffix]=id;
+  closeLocVendorPicker(suffix);
+  // 거래처 바꾸면 품목 검색어 초기화
+  document.getElementById("locItemSearch_"+suffix).value="";
+  renderLocPage(locKind(suffix));
+}
+
+function getLoc(it,kind){
+  if(kind==="product"){
+    if(!it.zone)return null;
+    return {zone:it.zone, col:it.col, cell:it.cell};
+  } else {
+    if(!it.mzone)return null;
+    return {zone:it.mzone, col:it.mcol, cell:it.mcell};
+  }
+}
+function formatLoc(loc, kind){
+  if(!loc)return "";
+  if(kind==="mold"){
+    // 금형: "A구역 3층 · 2번칸" (mzone이 "A-3" 형식, 기존 "a-1"도 호환)
+    const p=parseMoldZone(loc.zone);
+    let s;
+    if(p){
+      s=p.zone+"구역";
+      if(p.floor)s+=" "+p.floor+"층";
+    } else {
+      s=loc.zone+" 금형대";
+    }
+    if(loc.cell)s+=" · "+loc.cell+"번칸";
+    return s;
+  }
+  // 제품: "재고대 1 · 2열 · 3번칸"
+  let s="재고대 "+loc.zone;
+  if(loc.col)s+=" · "+loc.col+"열";
+  if(loc.cell)s+=" · "+loc.cell+"번칸";
+  return s;
+}
+
+function renderLocPage(kind){
+  const suffix=locSuffix(kind);
+  renderLocVendorPickerLabel(suffix);
+  if(kind==="mold") renderZoneChips();
+
+  const vendorId=locVendor[suffix];
+  const q=document.getElementById("locItemSearch_"+suffix).value.trim().toLowerCase();
+  const result=document.getElementById("locResult_"+suffix);
+
+  // 거래처 미선택 안내
+  if(!vendorId){
+    result.innerHTML=`<div class="loc-result-empty">먼저 위의 드롭다운에서 거래처를 선택해주세요.</div>`;
+    return;
+  }
+
+  // 해당 거래처의 품목들
+  const vendorItems=store.items.filter(it=>it.vendorId===vendorId);
+  if(!vendorItems.length){
+    result.innerHTML=`<div class="loc-result-empty">이 거래처에 등록된 품목이 없습니다.</div>`;
+    return;
+  }
+
+  // 검색어 없으면 안내
+  if(!q){
+    result.innerHTML=`<div class="loc-result-empty">위 검색창에 품목명 또는 코드를 입력하세요.<br><span style="font-size:12px;opacity:.8">이 거래처 품목: ${vendorItems.length}개</span></div>`;
+    return;
+  }
+
+  // 검색
+  const matched=vendorItems.filter(it=>{
+    const hay=(it.name+" "+(it.code||"")+" "+(it.color||"")+" "+(it.spec||"")).toLowerCase();
+    return hay.includes(q);
+  });
+
+  if(!matched.length){
+    result.innerHTML=`<div class="loc-result-empty">‘${esc(q)}’에 맞는 품목이 없습니다.</div>`;
+    return;
+  }
+
+  // 1개면 바로 위치 표시, 여러 개면 후보 목록
+  if(matched.length===1){
+    result.innerHTML=renderLocResult(matched[0],kind,vendorItems.length>1?matched:null);
+  } else {
+    result.innerHTML=renderLocCandidates(matched,kind,q);
+  }
+}
+
+function renderLocResult(it,kind,otherMatches){
+  const loc=getLoc(it,kind);
+  const kindLabel=kind==="product"?"제품 보관위치":"금형 보관위치";
+  const kindIco=kind==="product"?"📍":"🛠";
+  const vname=vendorName(it.vendorId)||"거래처 미지정";
+  let bigClass=kind==="mold"?"loc-big mold":"loc-big";
+  let bigContent;
+  if(loc){
+    bigContent=`<div class="loc-big-ico">${kindIco}</div>
+      <div class="loc-big-text">
+        <div class="loc-big-label">${kindLabel}</div>
+        <div class="loc-big-value">${esc(formatLoc(loc,kind))}</div>
+      </div>`;
+  } else {
+    bigClass="loc-big missing";
+    bigContent=`<div class="loc-big-ico">⚠️</div>
+      <div class="loc-big-text">
+        <div class="loc-big-label">${kindLabel}</div>
+        <div class="loc-big-value">아직 위치가 등록되지 않았습니다</div>
+      </div>`;
+  }
+  return `<div class="loc-result-card">
+    <div class="loc-result-head">
+      <div>
+        <div class="loc-result-name">${esc(it.name)}</div>
+        ${it.code?`<div class="loc-result-code">${esc(it.code)}</div>`:""}
+        <div class="loc-result-vendor">🏢 ${esc(vname)}</div>
+      </div>
+    </div>
+    <div class="${bigClass}">${bigContent}</div>
+  </div>`;
+}
+
+function renderLocCandidates(matched,kind,q){
+  const cards=matched.map(it=>{
+    const loc=getLoc(it,kind);
+    const locStr=loc?formatLoc(loc,kind):"위치 미등록";
+    return `<div class="loc-mini-item" onclick="pickLocItem('${kind}','${esc(it.name).replace(/'/g,"\\'")}')">
+      <span class="loc-mini-name">${esc(it.name)}</span>
+      <span class="loc-mini-code">${esc(locStr)}</span>
+    </div>`;
+  }).join("");
+  return `<div class="loc-result-card">
+    <div class="loc-result-head">
+      <div class="loc-result-name">‘${esc(q)}’ 검색 결과 ${matched.length}건</div>
+    </div>
+    <div class="loc-multi-hint">아래에서 정확한 품목을 선택하세요.</div>
+    <div class="loc-list-mini">${cards}</div>
+  </div>`;
+}
+
+function pickLocItem(kind,name){
+  const suffix=locSuffix(kind);
+  document.getElementById("locItemSearch_"+suffix).value=name;
+  renderLocPage(kind);
+}
+
+// ===== 금형 구역별 선반 보기 (A~Z 구역, 각 5층) =====
+// 금형 위치 형식: mzone = "A-3" (구역A 3층), mcell = 칸번호(옵션)
+// 구역 코드의 맨 앞 글자(A~Z)로 구역을 판별하고, 하이픈 뒤 숫자를 층으로 사용
+function parseMoldZone(mzone){
+  if(!mzone) return null;
+  const s=String(mzone).trim().toUpperCase();
+  const m=s.match(/^([A-Z])\s*[-\s]?\s*(\d+)?/);
+  if(!m) return null;
+  return { zone:m[1], floor:m[2]?parseInt(m[2],10):null };
+}
+// 특정 구역에 금형이 있는 품목 수
+function countMoldsInZone(zoneLetter){
+  return store.items.filter(it=>{
+    const p=parseMoldZone(it.mzone);
+    return p && p.zone===zoneLetter;
+  }).length;
+}
+function renderZoneChips(){
+  const box=document.getElementById("zoneChips");
+  if(!box) return;
+  box.innerHTML=SHELF_ZONES.map(z=>{
+    const cnt=countMoldsInZone(z);
+    const cntHtml=cnt>0?`<span class="chip-cnt">${cnt}</span>`:"";
+    return `<button class="zone-chip ${selectedZone===z?'active':''}" onclick="selectZone('${z}')">${z}${cntHtml}</button>`;
+  }).join("");
+  renderShelfView();
+}
+function selectZone(z){
+  selectedZone=(selectedZone===z)?"":z;  // 같은 구역 재클릭 시 닫기
+  renderZoneChips();
+}
+function renderShelfView(){
+  const view=document.getElementById("shelfView");
+  if(!view) return;
+  if(!selectedZone){
+    view.innerHTML=`<div class="shelf-empty">위에서 구역(A~Z)을 선택하면 5층 선반이 표시됩니다.</div>`;
+    return;
+  }
+  const z=selectedZone;
+  // 이 구역의 금형들을 층별로 모음
+  const byFloor={};
+  for(let f=1; f<=SHELF_FLOORS; f++) byFloor[f]=[];
+  const noFloor=[];  // 층 정보 없는 금형
+  store.items.forEach(it=>{
+    const p=parseMoldZone(it.mzone);
+    if(!p || p.zone!==z) return;
+    const entry={name:it.name, vendor:vendorName(it.vendorId), cell:it.mcell};
+    if(p.floor && p.floor>=1 && p.floor<=SHELF_FLOORS) byFloor[p.floor].push(entry);
+    else noFloor.push(entry);
+  });
+
+  let floorsHtml="";
+  for(let f=SHELF_FLOORS; f>=1; f--){
+    const items=byFloor[f];
+    const body = items.length
+      ? items.map(e=>`<span class="shelf-chip">${esc(e.name)}${e.cell?` <span style="color:var(--ink-soft)">(${esc(String(e.cell))}칸)</span>`:""}${e.vendor?`<span class="sc-vendor">${esc(e.vendor)}</span>`:""}</span>`).join("")
+      : `<span>비어 있음</span>`;
+    floorsHtml += `<div class="shelf-floor">
+      <div class="shelf-floor-label"><span class="shelf-floornum">${f}</span><span class="fl-sub">층</span></div>
+      <div class="shelf-floor-body ${items.length?'':'empty'}">${body}</div>
+    </div>`;
+  }
+
+  let noFloorHtml="";
+  if(noFloor.length){
+    noFloorHtml=`<div class="shelf-empty" style="margin-top:10px;text-align:left">
+      ⚠️ 층이 지정되지 않은 ${z}구역 금형 ${noFloor.length}건: ${noFloor.map(e=>esc(e.name)).join(", ")}
+      <br><span style="font-size:11.5px;opacity:.8">품목 수정에서 금형대를 “${z}-층번호” 형식으로 입력하면 해당 층에 표시됩니다.</span>
+    </div>`;
+  }
+
+  view.innerHTML=`<div class="shelf-wrap">
+    <div class="shelf-title"><span class="zcode">${z}</span>${z}구역 선반</div>
+    <div class="shelf-unit">${floorsHtml}</div>
+    ${noFloorHtml}
+  </div>`;
+}
+
+function render(){
+  if(currentPage==="schedule"){renderCalendar();renderDeliv();}
+  else if(currentPage==="master"){renderMaster();}
+  else if(currentPage==="vendors"){renderVendors();}
+  else if(currentPage==="items"){renderItems();}
+  else if(currentPage==="productLoc"){renderLocPage("product");}
+  else if(currentPage==="moldLoc"){renderLocPage("mold");}
+}
+
+(function init(){
+  const n=new Date();viewYear=n.getFullYear();viewMonth=n.getMonth();
+  load();renderLock();
+  ["d_target","d_produced"].forEach(id=>{const el=document.getElementById(id); if(el) el.addEventListener("input",calcShortage);});
+  ["d_qty","d_stock"].forEach(id=>{const el=document.getElementById(id); if(el) el.addEventListener("input",calcNeedProduction);});
+  if(isDesktop()) document.body.classList.add("sidebar-open");
+  navTo("schedule");
+})();
+</script>
+</body>
+</html>
