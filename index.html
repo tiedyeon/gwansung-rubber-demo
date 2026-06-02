@@ -910,6 +910,52 @@ function iso(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0
 function mondayOf(date){const d=new Date(date);const day=d.getDay();const diff=(day===0?-6:1-day);d.setDate(d.getDate()+diff);d.setHours(0,0,0,0);return d;}
 function fmtRange(mon){const sun=new Date(mon);sun.setDate(mon.getDate()+6);return `${mon.getMonth()+1}/${mon.getDate()} ~ ${sun.getMonth()+1}/${sun.getDate()}`;}
 function esc(s){return String(s||"").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+// ===== Phase 2 보강: 한국어 초성 검색 + 거래처 아바타 prefix 제거 =====
+function getChosung(text){
+  const CHO = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+  let out = '';
+  for(const ch of String(text||'')){
+    const code = ch.charCodeAt(0);
+    if(code >= 0xAC00 && code <= 0xD7A3){
+      out += CHO[Math.floor((code - 0xAC00) / 588)];
+    } else {
+      out += ch;
+    }
+  }
+  return out;
+}
+// 검색어가 자모(초성/모음)만 포함된 경우 true
+function isJamoOnly(s){ return /^[ㄱ-ㅎㅏ-ㅣ]+$/.test(String(s||'').replace(/\s/g,'')); }
+
+// 통합 검색 매칭: 일반 부분일치 OR 초성 매칭
+function matchSearch(haystack, query){
+  if(!query) return true;
+  const q = String(query).toLowerCase().trim();
+  const h = String(haystack||'').toLowerCase();
+  if(h.includes(q)) return true;
+  // 검색어에 자모가 포함되어 있으면 초성 검색
+  if(/[ㄱ-ㅎ]/.test(query)){
+    const hCho = getChosung(h);
+    const qCleaned = q.replace(/\s/g,'');
+    if(hCho.includes(qCleaned)) return true;
+  }
+  return false;
+}
+
+// 거래처 이름에서 prefix 제거하고 첫 글자 추출
+function avatarLetter(name){
+  if(!name) return '?';
+  let s = String(name);
+  // (주) (유) (사) [주] [유] 등 괄호 prefix 제거
+  s = s.replace(/^\s*[\(\[（\［]\s*(주|유|사|재|학)\s*[\)\]）\］]\s*/g, '');
+  // 주식회사/유한회사/사단법인 등 prefix 제거
+  s = s.replace(/^\s*(주식회사|유한회사|사단법인|재단법인|학교법인|의료법인)\s*/g, '');
+  // 추가 prefix (주), 주) 등
+  s = s.replace(/^\s*주\)\s*/g, '').replace(/^\s*유\)\s*/g, '');
+  s = s.trim();
+  return s ? s.charAt(0) : (String(name).trim().charAt(0) || '?');
+}
 function num(v){const n=Number(String(v??"").replace(/,/g,""));return isNaN(n)?0:n;}
 function fmtNum(v){return num(v).toLocaleString('ko-KR');}
 function calcShortage(){
@@ -1569,13 +1615,14 @@ function setVendorFilter(id){
 }
 function renderItems(){
   renderVendorPickerLabel();
-  const q=document.getElementById("itemSearch").value.trim().toLowerCase();
+  const qRaw=document.getElementById("itemSearch").value.trim();
+  const q=qRaw.toLowerCase();
   const zone=document.getElementById("zoneFilter").value;
   let list=store.items.filter(it=>{
     if(vendorFilter==='__none__'){ if(it.vendorId)return false; }
     else if(vendorFilter){ if(it.vendorId!==vendorFilter)return false; }
     if(zone&&it.zone!==zone)return false;
-    if(q){const hay=(it.name+" "+it.code+" "+it.color+" "+vendorName(it.vendorId)).toLowerCase();if(!hay.includes(q))return false;}
+    if(qRaw){const hay=(it.name+" "+it.code+" "+(it.color||"")+" "+vendorName(it.vendorId));if(!matchSearch(hay, qRaw))return false;}
     return true;
   });
   const total=store.items.length;
@@ -1757,8 +1804,8 @@ function closePhotoViewer(){document.getElementById("photoViewerOverlay").classL
 
 // ===== 거래처 =====
 function renderVendors(){
-  const q=document.getElementById("vendorSearch").value.trim().toLowerCase();
-  let list=store.vendors.filter(v=>!q||(v.name+" "+v.contact).toLowerCase().includes(q));
+  const qRaw=document.getElementById("vendorSearch").value.trim();
+  let list=store.vendors.filter(v=>!qRaw||matchSearch(v.name+" "+(v.contact||""), qRaw));
   document.getElementById("vendorCount").textContent=`전체 ${store.vendors.length}개 거래처 중 ${list.length}개 표시`;
   const wrap=document.getElementById("vendorList");
   if(!list.length){wrap.innerHTML=`<div class="empty-box">표시할 거래처가 없습니다.${unlocked?' 우측 상단 “거래처 추가”로 등록하세요.':''}</div>`;return;}
@@ -1766,7 +1813,7 @@ function renderVendors(){
   wrap.innerHTML=list.map(v=>{
     const cnt=store.items.filter(it=>it.vendorId===v.id).length;
     const actions=unlocked?`<div class="item-actions"><button class="icon-btn" onclick="editVendor('${v.id}')" title="수정">✎</button><button class="icon-btn" onclick="deleteVendor('${v.id}')" title="삭제">🗑</button></div>`:"";
-    return `<div class="vendor-card"><div class="vendor-avatar">${esc(v.name.charAt(0))}</div><div class="vendor-info"><div class="vendor-name">${esc(v.name)}</div><div class="vendor-meta">${v.contact?`<span>👤 ${esc(v.contact)}</span>`:""}${v.phone?`<span>📞 ${esc(v.phone)}</span>`:""}<span>📦 품목 ${cnt}개</span></div>${v.addr?`<div class="vendor-meta"><span>📍 ${esc(v.addr)}</span></div>`:""}${v.memo?`<div class="vendor-memo">${esc(v.memo)}</div>`:""}</div>${actions}</div>`;
+    return `<div class="vendor-card"><div class="vendor-avatar">${esc(avatarLetter(v.name))}</div><div class="vendor-info"><div class="vendor-name">${esc(v.name)}</div><div class="vendor-meta">${v.contact?`<span>👤 ${esc(v.contact)}</span>`:""}${v.phone?`<span>📞 ${esc(v.phone)}</span>`:""}<span>📦 품목 ${cnt}개</span></div>${v.addr?`<div class="vendor-meta"><span>📍 ${esc(v.addr)}</span></div>`:""}${v.memo?`<div class="vendor-memo">${esc(v.memo)}</div>`:""}</div>${actions}</div>`;
   }).join("");
 }
 
