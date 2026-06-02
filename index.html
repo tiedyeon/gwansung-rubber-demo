@@ -385,6 +385,58 @@
     .brand-text h1{font-size:14px}
     .topbar-spacer{flex:1}
   }
+  /* ===== Phase 1: 다크 모드 ===== */
+  [data-theme="dark"]{
+    --bg:#1a1c1f; --surface:#252830; --ink:#e8e6e0; --ink-soft:#9b988f;
+    --line:#3a3d44; --accent:#5ba893; --accent-soft:#243832;
+    --blue:#7ba5d6; --blue-soft:#1f2a3a; --warn:#e2845a; --warn-soft:#3a261c;
+    --done:#6a6760; --today:#d9a560; --sidebar:#15191c; --sidebar-soft:#1f262b;
+    --shadow:0 1px 2px rgba(0,0,0,.2),0 8px 24px rgba(0,0,0,.3);
+  }
+  [data-theme="dark"] .menu-toggle .bars span{background:var(--ink)}
+  [data-theme="dark"] .day:hover{background:#2c2f37}
+  [data-theme="dark"] .day.empty{background:#22242a}
+  [data-theme="dark"] .day.empty:hover{background:#22242a}
+  [data-theme="dark"] .day.selected{background:var(--accent-soft)}
+  [data-theme="dark"] .item.has-shortage{background:linear-gradient(to right,#2a1f1c 0,var(--surface) 80px,var(--surface) 100%)}
+  [data-theme="dark"] .stats-row{background:#1f2228}
+  [data-theme="dark"] .item.done{opacity:.55}
+  [data-theme="dark"] .progress-bar{background:#3a3d44}
+
+  /* ===== Phase 1: 테마 토글 버튼 ===== */
+  .theme-toggle{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--surface);cursor:pointer;display:grid;place-items:center;flex-shrink:0;transition:.15s;padding:0;font-size:17px;color:var(--ink)}
+  .theme-toggle:hover{background:var(--bg)}
+
+  /* ===== Phase 1: 모바일 반응형 보강 ===== */
+  @media (max-width:520px){
+    .topbar{padding:9px 12px;gap:8px}
+    .brand-text h1{font-size:13px}
+    .brand-text p{display:none}
+    .lock-btn{padding:8px 10px;font-size:12px}
+    .lock-btn span:nth-child(2){display:none}
+    .theme-toggle{width:36px;height:36px;font-size:15px}
+    .main{padding:14px 12px 60px}
+    .page-title{font-size:18px}
+    .cal-head{padding:12px 14px}
+    .cal-title{font-size:15px}
+    .list-head{padding:12px 14px}
+    .list-title{font-size:15px}
+    .add-btn{padding:7px 11px;font-size:12px}
+    .day-num{font-size:11.5px}
+    .day{min-height:46px;padding:3px 2px}
+    .badge{font-size:9px;padding:1px 3px}
+    .stats-row{padding:0 14px 12px;gap:5px}
+    .stat-chip{font-size:10.5px;padding:3px 8px}
+    .item{padding:11px 12px}
+    .vendor{font-size:14px}
+    .item-meta{font-size:12.5px}
+    .shortage-badge{font-size:9.5px;padding:1px 5px}
+    .vendor-card{padding:12px 14px}
+    .shelf-floor{flex-direction:column;align-items:stretch}
+    .shelf-floor-label{flex-direction:row;justify-content:center;padding:4px 8px;border-right:none;border-bottom:1px solid var(--line)}
+    .modal-content{margin:14px;width:auto;max-height:calc(100vh - 28px)}
+  }
+
 </style>
 </head>
 <body>
@@ -423,6 +475,9 @@
       </div>
     </div>
     <div class="topbar-spacer"></div>
+    <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" aria-label="테마 전환" title="라이트/다크 전환">
+      <span id="themeIcon">🌙</span>
+    </button>
     <button class="lock-btn" id="lockBtn" onclick="toggleLock()">
       <span id="lockIcon">🔒</span><span id="lockLabel">관리자키</span>
     </button>
@@ -743,6 +798,29 @@ let editingDelivId=null,editingItemId=null,editingVendorId=null;
 let tempPhotos=[];
 let tempMoldPhotos=[];
 let tempDefectPhotos=[];
+
+// ===== Phase 1: 다크 모드 (브라우저 localStorage 사용, DB와 무관) =====
+function applyTheme(theme){
+  document.documentElement.setAttribute('data-theme', theme);
+  const icon = document.getElementById('themeIcon');
+  if(icon) icon.textContent = theme === 'dark' ? '☀️' : '🌙';
+  try{ localStorage.setItem('gs_theme', theme); }catch(e){}
+}
+function toggleTheme(){
+  const cur = document.documentElement.getAttribute('data-theme') || 'light';
+  applyTheme(cur === 'dark' ? 'light' : 'dark');
+}
+(function(){
+  try{
+    const saved = localStorage.getItem('gs_theme');
+    if(saved === 'dark') document.documentElement.setAttribute('data-theme','dark');
+  }catch(e){}
+})();
+document.addEventListener('DOMContentLoaded',()=>{
+  const cur = document.documentElement.getAttribute('data-theme') || 'light';
+  const icon = document.getElementById('themeIcon');
+  if(icon) icon.textContent = cur === 'dark' ? '☀️' : '🌙';
+});
 
 // ===== Supabase 설정 =====
 const SUPABASE_URL = 'https://wgarlhwmjhybiowvpsam.supabase.co';
