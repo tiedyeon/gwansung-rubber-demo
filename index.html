@@ -139,6 +139,21 @@
   .deliv-search-row input{flex:1;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:13px;padding:8px 12px;border-radius:8px;outline:none}
   .deliv-search-row input:focus{border-color:var(--accent)}
 
+  /* ===== Phase 2 보강: 거래처 선택 시 품목 카드 그리드 ===== */
+  .vendor-items-header{display:flex;align-items:center;justify-content:space-between;padding:14px 4px 8px;flex-wrap:wrap;gap:8px}
+  .vendor-items-title{font-size:14px;font-weight:700;color:var(--ink)}
+  .vendor-items-title .v-name{color:var(--accent)}
+  .vendor-items-count{font-size:12px;color:var(--ink-soft);font-weight:600;background:var(--bg);padding:3px 10px;border-radius:14px}
+  .vi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:11px}
+  .vi-card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:13px 14px;cursor:pointer;transition:.15s;display:flex;flex-direction:column;gap:7px}
+  .vi-card:hover{border-color:var(--accent);box-shadow:0 4px 12px rgba(47,111,94,.08);transform:translateY(-1px)}
+  .vi-name{font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.35}
+  .vi-code{font-size:11.5px;color:var(--ink-soft);line-height:1.35}
+  .vi-loc{font-size:12px;color:var(--accent);font-weight:600;display:flex;align-items:center;gap:5px;margin-top:auto;padding-top:6px;border-top:1px dashed var(--line)}
+  .vi-loc.missing{color:var(--warn)}
+  .vi-loc.missing .vi-loc-ico{opacity:.7}
+  [data-theme="dark"] .vi-card:hover{box-shadow:0 4px 12px rgba(91,168,147,.15)}
+
   /* 토스트 알림 */
   .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 20px;border-radius:10px;font-size:13.5px;font-weight:600;z-index:200;box-shadow:0 4px 18px rgba(0,0,0,.18);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px)}
@@ -2074,9 +2089,9 @@ function renderLocPage(kind){
     return;
   }
 
-  // 검색어 없으면 안내
+  // 검색어 없으면 → 거래처의 모든 품목을 카드 그리드로 표시
   if(!q){
-    result.innerHTML=`<div class="loc-result-empty">위 검색창에 품목명 또는 코드를 입력하세요.<br><span style="font-size:12px;opacity:.8">이 거래처 품목: ${vendorItems.length}개</span></div>`;
+    result.innerHTML = renderVendorItemsGrid(vendorItems, kind, vendorId);
     return;
   }
 
@@ -2097,6 +2112,45 @@ function renderLocPage(kind){
   } else {
     result.innerHTML=renderLocCandidates(matched,kind,q);
   }
+}
+
+// 거래처 선택 시 그 거래처의 품목을 카드 그리드로 표시
+function renderVendorItemsGrid(vendorItems, kind, vendorId){
+  const vname = vendorName(vendorId) || "거래처";
+  const kindLabel = kind === "product" ? "제품" : "금형";
+  const totalCount = vendorItems.length;
+  
+  // 위치 정보 통계
+  let withLoc = 0, withoutLoc = 0;
+  vendorItems.forEach(it => {
+    const loc = getLoc(it, kind);
+    if(loc) withLoc++; else withoutLoc++;
+  });
+  
+  const header = `<div class="vendor-items-header">
+    <div class="vendor-items-title">🏢 <span class="v-name">${esc(vname)}</span> · ${kindLabel} 보관 품목</div>
+    <div class="vendor-items-count">전체 ${totalCount}개${withoutLoc?` · 위치등록 ${withLoc}개 / 미등록 ${withoutLoc}개`:''}</div>
+  </div>`;
+  
+  const cards = vendorItems.map(it => {
+    const loc = getLoc(it, kind);
+    const locHtml = loc 
+      ? `<div class="vi-loc"><span class="vi-loc-ico">📍</span><span>${esc(formatLoc(loc, kind))}</span></div>`
+      : `<div class="vi-loc missing"><span class="vi-loc-ico">⚠️</span><span>위치 미등록</span></div>`;
+    const codeHtml = it.code ? `<div class="vi-code">${esc(it.code)}</div>` : '';
+    // 클릭하면 검색창에 품목명 채워서 상세 표시로 전환
+    const suffix = locSuffix(kind);
+    const safeName = String(it.name||'').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    return `<div class="vi-card" onclick="document.getElementById('locItemSearch_${suffix}').value='${safeName}'; renderLocPage('${kind}');" title="클릭하면 상세 위치 표시">
+      <div class="vi-name">${esc(it.name)}</div>
+      ${codeHtml}
+      ${locHtml}
+    </div>`;
+  }).join('');
+  
+  const hint = `<div class="loc-result-empty" style="background:transparent;padding:10px 4px;font-size:12px;color:var(--ink-soft);text-align:left">💡 카드를 클릭하면 상세 위치를 크게 볼 수 있어요. 또는 위 검색창에 품목명/코드를 입력하세요.</div>`;
+  
+  return header + `<div class="vi-grid">${cards}</div>` + hint;
 }
 
 function renderLocResult(it,kind,otherMatches){
