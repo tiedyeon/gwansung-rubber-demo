@@ -120,6 +120,19 @@
   .item-meta{font-size:13px;color:var(--ink-soft);margin-top:2px}
   .item-memo{font-size:12.5px;color:var(--ink-soft);margin-top:3px;font-style:italic}
   .item-loc{font-size:12px;color:var(--accent);font-weight:600;margin-top:3px}
+
+  /* ===== 부족 발생 강조 (3번 단기) ===== */
+  .item.has-shortage{position:relative;background:linear-gradient(to right,#fef4f1 0,#fff 80px,#fff 100%);border-left:4px solid var(--warn)}
+  .shortage-badge{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;color:#fff;background:var(--warn);border-radius:6px;padding:2px 7px;margin-left:6px;letter-spacing:.02em;flex-shrink:0}
+  .item.has-shortage .short{font-size:13px;font-weight:700;color:var(--warn);text-shadow:0 0 1px rgba(180,84,31,.15)}
+  
+  /* ===== 금주 요약 통계 ===== */
+  .stats-row{display:flex;flex-wrap:wrap;gap:6px;padding:0 18px 14px;border-bottom:1px solid var(--line);background:#fbfaf6}
+  .stat-chip{font-size:11.5px;font-weight:600;padding:4px 10px;border-radius:14px;display:inline-flex;align-items:center;gap:5px;background:var(--surface);border:1px solid var(--line);color:var(--ink-soft)}
+  .stat-chip.shortage{background:#fdeee5;border-color:#f1c5a8;color:var(--warn)}
+  .stat-chip.working{background:#e6eef6;border-color:#bcd0e6;color:var(--blue)}
+  .stat-chip.done{background:var(--accent-soft);border-color:#bcdacd;color:var(--accent)}
+  .stat-chip .num{font-weight:800;font-size:12.5px}
   .prod-progress{margin-top:8px;background:var(--bg);border-radius:9px;padding:8px 10px;font-size:12.5px;color:var(--ink);}
   .prod-progress strong{color:var(--accent);}
   .prod-progress .short{color:var(--warn);font-weight:700;}
@@ -1174,9 +1187,38 @@ function renderDeliv(){
   let view=selectedDate?store.deliveries.filter(it=>it.due===selectedDate):store.deliveries.filter(it=>it.due>=monStr&&it.due<=sunStr);
   view.sort((a,b)=>a.due<b.due?-1:a.due>b.due?1:(a.done-b.done));
   const wrap=document.getElementById("delivList");
+  
+  // === 통계 계산: 부족/작업중/완료 ===
+  const stats={shortage:0,working:0,waiting:0,done:0};
+  view.forEach(it=>{
+    const qtyN=num(it.qty), stockN=num(it.stockQty);
+    const targetN=it.targetQty!==undefined&&it.targetQty!==""?num(it.targetQty):Math.max(qtyN-stockN,0);
+    const producedN=num(it.producedQty);
+    const shortageN=Math.max(targetN-producedN,0);
+    if(it.done) stats.done++;
+    else{
+      if(shortageN>0) stats.shortage++;
+      const status=it.prodStatus||"대기";
+      if(status==="작업중") stats.working++;
+      else if(status==="대기") stats.waiting++;
+    }
+  });
+  
+  // === 상단 요약 통계 바 ===
+  let statsBar="";
+  if(view.length){
+    const chips=[];
+    if(stats.shortage>0) chips.push(`<span class="stat-chip shortage">⚠️ 부족 <span class="num">${stats.shortage}</span>건</span>`);
+    if(stats.working>0) chips.push(`<span class="stat-chip working">🔧 작업중 <span class="num">${stats.working}</span>건</span>`);
+    if(stats.waiting>0) chips.push(`<span class="stat-chip">⏳ 대기 <span class="num">${stats.waiting}</span>건</span>`);
+    if(stats.done>0) chips.push(`<span class="stat-chip done">✅ 완료 <span class="num">${stats.done}</span>건</span>`);
+    if(chips.length) statsBar=`<div class="stats-row">${chips.join("")}</div>`;
+  }
+  
   if(!view.length){wrap.innerHTML=`<div class="empty-msg">${selectedDate?'선택한 날짜에 납기 건이 없습니다.':'이번 주 납기 건이 없습니다.'}</div>`;return;}
   const todayStr=iso(now);
-  wrap.innerHTML=view.map(it=>{
+  
+  const itemsHtml=view.map(it=>{
     const [,m,d]=it.due.split("-");const dueLabel=`${parseInt(m)}/${parseInt(d)}`;
     const soon=(!it.done&&it.due===todayStr);
     const loc=findItemLoc(it.item);
@@ -1187,8 +1229,16 @@ function renderDeliv(){
     const pct=targetN?Math.min(100,Math.round(producedN/targetN*100)):0;
     const status=it.prodStatus||it.workStatus||"대기";
     const detail=`<div class="prod-progress"><div>재고 ${fmtNum(stockN)}개 · 작업자 ${esc(it.worker||'-')} · <strong>${esc(status)}</strong> · 생산 ${fmtNum(producedN)} / ${fmtNum(targetN)}개 · <span class="short">부족 ${fmtNum(shortageN)}개</span></div><div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div></div>`;
-    return `<div class="item ${it.done?'done':''}"><div class="check ${it.done?'checked':''} ${unlocked?'':'locked'}" onclick="event.stopPropagation();toggleDone('${it.id}')">${it.done?'✓':''}</div><div class="item-body" onclick="editDeliv('${it.id}')"><div class="item-top"><span class="vendor">${esc(it.vendor)}</span><span class="due-tag ${soon?'soon':''}">${dueLabel}${soon?' · 오늘':''}</span></div><div class="item-meta">${esc(it.item)} · 납품 ${fmtNum(qtyN)}개</div>${detail}${loc?`<div class="item-loc">📍 ${esc(loc)}</div>`:""}${it.memo?`<div class="item-memo">${esc(it.memo)}</div>`:""}</div>${actions}</div>`;
+    
+    // === 부족 발생 카드 강조 ===
+    const hasShortage = !it.done && shortageN > 0;
+    const cardClasses = `item ${it.done?'done':''} ${hasShortage?'has-shortage':''}`;
+    const shortageBadge = hasShortage ? `<span class="shortage-badge">⚠️ 부족 ${fmtNum(shortageN)}</span>` : '';
+    
+    return `<div class="${cardClasses}"><div class="check ${it.done?'checked':''} ${unlocked?'':'locked'}" onclick="event.stopPropagation();toggleDone('${it.id}')">${it.done?'✓':''}</div><div class="item-body" onclick="editDeliv('${it.id}')"><div class="item-top"><span class="vendor">${esc(it.vendor)}</span><span class="due-tag ${soon?'soon':''}">${dueLabel}${soon?' · 오늘':''}</span>${shortageBadge}</div><div class="item-meta">${esc(it.item)} · 납품 ${fmtNum(qtyN)}개</div>${detail}${loc?`<div class="item-loc">📍 ${esc(loc)}</div>`:""}${it.memo?`<div class="item-memo">${esc(it.memo)}</div>`:""}</div>${actions}</div>`;
   }).join("");
+  
+  wrap.innerHTML = statsBar + itemsHtml;
 }
 function findItemLoc(itemName){
   const it=store.items.find(x=>x.name===itemName);
